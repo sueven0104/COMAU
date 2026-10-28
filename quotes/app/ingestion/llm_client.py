@@ -50,6 +50,7 @@ class LLMClient:
         model = self.vision_model if images else self.text_model
         resp = self.client.chat.completions.create(
             model=model, temperature=0,
+            extra_body={"enable_thinking": False},  # 思考模型关闭思考，加快抽取
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": content}])
         return resp.choices[0].message.content
