@@ -36,3 +36,26 @@ def test_upsert_idempotent_and_reingest():
     db.insert_quote_items(conn, fid, "BAIC", [ITEM])
     db.delete_items_for_file(conn, fid)
     assert db.count_items(conn, source_file_id=fid) == 0
+
+def test_search_keyword_status_limit():
+    conn = _conn()
+    fid = db.upsert_source_file(conn, {
+        "path": "D:/x/b.xlsx", "content_hash": "h2", "file_type": ".xlsx",
+        "project_code": "TESLA", "email_subject": None, "email_from": None,
+        "email_date": None, "email_body": None, "processed_at": db.now()})
+    items = []
+    for i in range(3):
+        items.append({**ITEM, "product_name": "滚床", "spec": f"型号{i}",
+                      "project_code": None, "price_status": "成交价" if i < 2 else "预估价",
+                      "quote_date": f"2026-09-0{i+1}"})
+    db.insert_quote_items(conn, fid, "TESLA", items)
+    # keyword 命中
+    assert len(db.search_items(conn, keyword="滚床")) == 3
+    # price_status 精确过滤
+    assert len(db.search_items(conn, price_status="成交价")) == 2
+    # projects 过滤（大小写不敏感）
+    assert len(db.search_items(conn, projects=["tesla"])) == 3
+    # limit 生效
+    assert len(db.search_items(conn, limit=2)) == 2
+    # 组合：keyword+status
+    assert len(db.search_items(conn, keyword="滚床", price_status="预估价")) == 1

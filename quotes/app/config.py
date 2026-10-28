@@ -24,7 +24,8 @@ def load_config(path=None) -> dict:
         if env:
             cfg[k] = env
     cfg["api_key"] = os.environ.get("QUOTES_API_KEY", "")
-    cfg["base_url"] = os.environ.get("QUOTES_BASE_URL", "https://api.openai.com/v1")
+    cfg["base_url"] = os.environ.get(
+        "QUOTES_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
     cfg["data_root_abs"] = (ROOT / cfg["data_root"]).resolve()
     cfg["db_path_abs"] = (ROOT / cfg["db_path"]).resolve()
     return cfg

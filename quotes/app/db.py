@@ -70,18 +70,18 @@ ITEM_COLUMNS = ["supplier", "category", "product_name", "spec", "brand", "model"
 def insert_quote_items(conn, source_file_id: int, project_code: str, items: list) -> list:
     ids = []
     placeholders = ",".join("?" * (len(ITEM_COLUMNS) + 3))
-    for it in items:
-        row = [it.get(c) for c in ITEM_COLUMNS]
-        row[ITEM_COLUMNS.index("tax_included")] = (
-            None if it.get("tax_included") is None else int(bool(it["tax_included"])))
-        row[ITEM_COLUMNS.index("confidence")] = it.get("confidence", 1.0)
-        row[ITEM_COLUMNS.index("needs_review")] = int(bool(it.get("needs_review")))
-        cur = conn.execute(
-            f"""INSERT INTO quote_items(source_file_id, project_code, {','.join(ITEM_COLUMNS)}, created_at)
-                VALUES({placeholders})""",
-            (source_file_id, project_code, *row, now()))
-        ids.append(cur.lastrowid)
-    conn.commit()
+    with conn:  # 异常自动回滚，避免中途失败留下半量数据或未关闭事务
+        for it in items:
+            row = [it.get(c) for c in ITEM_COLUMNS]
+            row[ITEM_COLUMNS.index("tax_included")] = (
+                None if it.get("tax_included") is None else int(bool(it["tax_included"])))
+            row[ITEM_COLUMNS.index("confidence")] = it.get("confidence", 1.0)
+            row[ITEM_COLUMNS.index("needs_review")] = int(bool(it.get("needs_review")))
+            cur = conn.execute(
+                f"""INSERT INTO quote_items(source_file_id, project_code, {','.join(ITEM_COLUMNS)}, created_at)
+                    VALUES({placeholders})""",
+                (source_file_id, project_code, *row, now()))
+            ids.append(cur.lastrowid)
     return ids
 
 def delete_items_for_file(conn, source_file_id: int):
