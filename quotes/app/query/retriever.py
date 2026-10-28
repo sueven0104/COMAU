@@ -24,21 +24,22 @@ def filter_from_dict(d: dict) -> QueryFilter:
         keyword=d.get("keyword") or None)
 
 def _where(f: QueryFilter):
+    # 列名全限定：JOIN source_files 后两表均有 project_code，裸列名会歧义
     q, args = " WHERE 1=1", []
-    for col, vals in (("LOWER(category)", f.categories),
-                      ("LOWER(supplier)", f.suppliers),
-                      ("LOWER(project_code)", f.projects)):
+    for col, vals in (("LOWER(quote_items.category)", f.categories),
+                      ("LOWER(quote_items.supplier)", f.suppliers),
+                      ("LOWER(quote_items.project_code)", f.projects)):
         if vals:
             q += f" AND {col} IN ({','.join('?' * len(vals))})"
             args += [v.lower() for v in vals]
     if f.price_status:
-        q += " AND price_status=?"; args.append(f.price_status)
+        q += " AND quote_items.price_status=?"; args.append(f.price_status)
     if f.date_from:
-        q += " AND quote_date>=?"; args.append(f.date_from)
+        q += " AND quote_items.quote_date>=?"; args.append(f.date_from)
     if f.date_to:
-        q += " AND quote_date<=?"; args.append(f.date_to)
+        q += " AND quote_items.quote_date<=?"; args.append(f.date_to)
     if f.keyword:
-        q += " AND (product_name LIKE ? OR spec LIKE ? OR brand LIKE ?)"
+        q += " AND (quote_items.product_name LIKE ? OR quote_items.spec LIKE ? OR quote_items.brand LIKE ?)"
         args += [f"%{f.keyword}%"] * 3
     return q, args
 

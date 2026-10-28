@@ -38,3 +38,10 @@ def test_stats():
     conn = _seed()
     s = retriever.stats(conn, retriever.QueryFilter(categories=["7-axis"]))
     assert s["count"] == 2 and s["min"] == 100.0 and s["max"] == 200.0
+
+def test_projects_filter_no_ambiguous_column():
+    # JOIN source_files 后两表均有 project_code，裸列名会报 ambiguous column
+    conn = _seed()
+    rows = retriever.search(conn, retriever.QueryFilter(projects=["baic"]))
+    assert len(rows) == 2
+    assert all(r["source_path"] == "D:/a.xlsx" for r in rows)
