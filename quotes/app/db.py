@@ -30,6 +30,11 @@ CREATE INDEX IF NOT EXISTS idx_items_supplier ON quote_items(supplier);
 CREATE TABLE IF NOT EXISTS suppliers(
   name TEXT PRIMARY KEY, aliases TEXT NOT NULL DEFAULT '[]', brands TEXT NOT NULL DEFAULT '[]'
 );
+CREATE TABLE IF NOT EXISTS item_vectors(
+  item_id INTEGER PRIMARY KEY REFERENCES quote_items(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  vector TEXT NOT NULL
+);
 """
 
 def connect(db_path) -> sqlite3.Connection:
