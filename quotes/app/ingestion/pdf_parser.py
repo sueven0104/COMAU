@@ -1,7 +1,7 @@
 """PDF 文本层提取；无文本层（扫描版）标记 needs_vision，由管道渲染 PNG 走视觉模型。"""
 from dataclasses import dataclass
 from pathlib import Path
-import fitz
+import pymupdf as fitz
 
 @dataclass
 class PdfContent:

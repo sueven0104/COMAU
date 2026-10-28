@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 from app.ingestion.pdf_parser import parse_pdf, render_pages_to_png
 
 def _make_pdf(path, text):
