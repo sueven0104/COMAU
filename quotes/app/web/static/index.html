@@ -1,2 +1,118 @@
-<!doctype html><html lang="zh"><head><meta charset="utf-8">
-<title>AI 报价查询</title></head><body>placeholder</body></html>
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 报价查询系统</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1a1a1a; --muted:#667; --line:#e3e5e8; --brand:#0a7d43; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.6 "Segoe UI","PingFang SC",sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:12px 24px; display:flex; gap:16px; align-items:center; }
+  header h1 { font-size:16px; margin:0; }
+  nav button { border:1px solid var(--line); background:var(--bg); padding:6px 14px; border-radius:8px; cursor:pointer; }
+  nav button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  main { max-width:1100px; margin:20px auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .msg { padding:10px 14px; border-radius:10px; margin:8px 0; white-space:pre-wrap; }
+  .msg.user { background:#e8f0ea; margin-left:30%; }
+  .msg.bot { background:var(--bg); margin-right:10%; }
+  .cite { display:inline-block; font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:6px; padding:1px 6px; margin:2px; }
+  input[type=text] { flex:1; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  button.pri { background:var(--brand); color:#fff; border:0; border-radius:8px; padding:10px 18px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background:var(--bg); }
+  .tier-精确匹配 { color:var(--brand); font-weight:600; }
+  .tier-无匹配 { color:#c0392b; }
+  .muted { color:var(--muted); font-size:12px; }
+  .row { display:flex; gap:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 报价查询系统</h1>
+  <nav>
+    <button data-tab="chat" class="on">对话查询</button>
+    <button data-tab="inquiry">清单匹配</button>
+    <button data-tab="data">数据管理</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-chat" class="card">
+    <div id="chatlog"><p class="muted">例：BE22 七轴各家报价对比？滚床最低价是多少？Fronius CMT 报过几次？</p></div>
+    <div class="row"><input id="q" type="text" placeholder="输入问题，回车发送"><button class="pri" id="send">提问</button></div>
+  </section>
+
+  <section id="tab-inquiry" class="card" hidden>
+    <p>上传新项目询价清单（.xlsx，需含 Product/Qty 表头），逐行匹配历史报价：</p>
+    <div class="row"><input id="file" type="file" accept=".xlsx"><button class="pri" id="upload">上传匹配</button></div>
+    <div id="inqresult"></div>
+  </section>
+
+  <section id="tab-data" class="card" hidden>
+    <h3>已入库文件</h3><div id="filetable" class="muted">加载中…</div>
+    <h3>待人工复核（低置信度/校验警告）</h3><div id="reviewtable" class="muted">加载中…</div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on");
+  ["chat","inquiry","data"].forEach(t => $("#tab-"+t).hidden = t !== b.dataset.tab);
+});
+
+async function ask() {
+  const q = $("#q").value.trim(); if (!q) return;
+  $("#q").value = "";
+  const log = $("#chatlog");
+  log.insertAdjacentHTML("beforeend", `<div class="msg user">${q}</div>`);
+  const div = document.createElement("div"); div.className = "msg bot"; div.textContent = "思考中…";
+  log.appendChild(div); log.parentElement.scrollTop = 1e9;
+  try {
+    const r = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question:q})});
+    const d = await r.json();
+    div.textContent = d.answer;
+    if (d.citations && d.citations.length)
+      div.insertAdjacentHTML("beforeend", "<div>" + d.citations.slice(0,8).map(c =>
+        `<span class="cite" title="${c.source_path||""} ${c.source_location||""}">来源#${c.item_id}</span>`).join("") + "</div>");
+  } catch (e) { div.textContent = "请求失败：" + e; }
+}
+$("#send").onclick = ask;
+$("#q").onkeydown = e => { if (e.key === "Enter") ask(); };
+
+$("#upload").onclick = async () => {
+  const f = $("#file").files[0]; if (!f) return alert("请选择文件");
+  $("#inqresult").textContent = "匹配中…";
+  const fd = new FormData(); fd.append("file", f);
+  const r = await fetch("/api/inquiry/upload", {method:"POST", body:fd});
+  if (!r.ok) { $("#inqresult").textContent = "上传失败：" + (await r.text()); return; }
+  const d = await r.json();
+  let html = `<p>共 ${d.count} 行。 <a href="/api/inquiry/${d.batch_id}/draft.xlsx">下载报价建议草稿.xlsx</a></p>
+    <table><tr><th>行</th><th>产品</th><th>档位</th><th>建议价</th><th>区间</th><th>依据</th><th>说明</th></tr>`;
+  for (const x of d.results)
+    html += `<tr><td>${x.row_index}</td><td>${x.product||""}</td>
+      <td class="tier-${x.tier}">${x.tier}</td><td>${x.suggested_price ?? ""}</td>
+      <td>${x.price_range ? x.price_range[0]+"~"+x.price_range[1] : ""}</td>
+      <td class="muted">${x.basis||""}</td><td class="muted">${x.explanation||""}</td></tr>`;
+  $("#inqresult").innerHTML = html + "</table>";
+};
+
+async function loadData() {
+  const f = await (await fetch("/api/files")).json();
+  $("#filetable").innerHTML = "<table><tr><th>项目</th><th>文件</th><th>类型</th><th>明细数</th><th>邮件主题</th></tr>" +
+    f.files.map(x => `<tr><td>${x.project_code}</td><td>${x.path}</td><td>${x.file_type}</td>
+      <td>${x.item_count}</td><td class="muted">${x.email_subject||""}</td></tr>`).join("") + "</table>";
+  const rv = await (await fetch("/api/review")).json();
+  $("#reviewtable").innerHTML = rv.review.length
+    ? "<table><tr><th>ID</th><th>产品</th><th>价格</th><th>供应商</th><th>位置</th><th>文件</th></tr>" +
+      rv.review.map(x => `<tr><td>${x.id}</td><td>${x.product_name||""}</td><td>${x.unit_price??""}</td>
+        <td>${x.supplier||""}</td><td>${x.source_location||""}</td><td class="muted">${x.path}</td></tr>`).join("") + "</table>"
+    : "无待复核项";
+}
+loadData();
+</script>
+</body>
+</html>
