@@ -1,9 +1,13 @@
 """四档匹配：规则优先（品类/品牌/文本相似度），LLM 仅兜底品类分类。建议价仅供参考。"""
+import logging
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from statistics import median
 
 from .. import db
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class MatchResult:
@@ -61,9 +65,11 @@ def guess_category(conn, line, client=None):
                 f"品类列表：{','.join(cats)}\n设备：{line.product} {line.spec or ''}")
             c = out.get("category")
             if c in cats:
+                log.debug("LLM 品类兜底命中：行 %s -> %s", line.row_index, c)
                 return c
-        except Exception:
-            pass
+            log.debug("LLM 品类兜底返回无效品类 %r", c)
+        except Exception as e:
+            log.debug("LLM 品类兜底失败（降级为无品类）：%s", e)
     return None
 
 def _line_text(line) -> str:
@@ -73,6 +79,8 @@ def match_line(conn, line, client=None) -> MatchResult:
     cat = guess_category(conn, line, client)
     cands = [dict(r) for r in db.search_items(conn, categories=[cat])] if cat else []
     if not cands:
+        log.debug("行 %d %r：无匹配（品类 %s，库中无历史报价）",
+                  line.row_index, line.product, cat)
         return MatchResult(line_id=line.row_index, tier="无匹配",
                            explanation="库中无该品类历史报价，需发起新询价")
     lt = _line_text(line)
@@ -104,6 +112,8 @@ def match_line(conn, line, client=None) -> MatchResult:
 
     if exact:
         best = prefer(exact)
+        log.debug("行 %d：精确匹配 %d 条候选，建议价 %s（品类 %s）",
+                  line.row_index, len(exact), best["unit_price"], cat)
         return MatchResult(line.row_index, "精确匹配", suggested_price=best["unit_price"],
                            quote_item_ids=[c["id"] for c in exact],
                            basis=basis_of(exact),
@@ -114,6 +124,9 @@ def match_line(conn, line, client=None) -> MatchResult:
         diffs = []
         if line.brand and brands and not any(_brand_equal(line.brand, b) for b in brands):
             diffs.append(f"品牌差异：清单 {line.brand} vs 历史 {'/'.join(list(brands)[:3])}")
+        log.debug("行 %d：相似匹配 %d 条候选，价格区间 %s（品类 %s）",
+                  line.row_index, len(similar),
+                  (min(prices), max(prices)) if prices else None, cat)
         return MatchResult(line.row_index, "相似匹配",
                            suggested_price=median(prices) if prices else None,
                            price_range=(min(prices), max(prices)) if prices else None,
@@ -121,6 +134,8 @@ def match_line(conn, line, client=None) -> MatchResult:
                            basis=basis_of(similar),
                            explanation="；".join(filter(None, diffs + ["同品类，品牌/规格存在差异"])))
     prices = [c["unit_price"] for c in cands if c["unit_price"] is not None]
+    log.debug("行 %d：弱匹配，仅品类相同（%s），候选 %d 条",
+              line.row_index, cat, len(cands))
     return MatchResult(line.row_index, "弱匹配",
                        suggested_price=median(prices) if prices else None,
                        price_range=(min(prices), max(prices)) if prices else None,
@@ -129,4 +144,8 @@ def match_line(conn, line, client=None) -> MatchResult:
                        explanation="仅品类相同，价格区间跨度大，务必人工判断")
 
 def match_batch(conn, client, lines) -> list:
-    return [match_line(conn, ln, client) for ln in lines]
+    results = [match_line(conn, ln, client) for ln in lines]
+    dist = Counter(m.tier for m in results)
+    log.info("清单匹配完成：%d 行（%s）", len(results),
+             " ".join(f"{k} {v}" for k, v in dist.items()) or "空")
+    return results

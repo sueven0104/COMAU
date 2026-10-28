@@ -1,6 +1,11 @@
 """解析新项目询价清单 xlsx：定位 Inquiry 表、容错映射表头、产出清单行。"""
+import logging
 from dataclasses import dataclass
+from pathlib import Path
+
 import openpyxl
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class InquiryLine:
@@ -63,6 +68,7 @@ def parse_inquiry_xlsx(path) -> list:
                 header_row, mapping = i, m
                 break
         if header_row is None:
+            log.debug("sheet %r 未识别到表头，跳过", ws.title)
             continue
         lines = []
         for i, row in enumerate(grid[header_row + 1:], start=header_row + 2):
@@ -86,7 +92,10 @@ def parse_inquiry_xlsx(path) -> list:
                 brand=brand, qty=_to_num(get("qty")),
                 unit=None, category=str(get("category")).strip() if get("category") else None))
         if lines:
+            log.info("询价清单解析完成：%s sheet %r 第 %d 行表头，共 %d 行清单",
+                     Path(path).name, ws.title, header_row + 1, len(lines))
             wb.close()
             return lines
+    log.warning("询价清单解析失败：所有 sheet 均未识别到表头 %s", Path(path).name)
     wb.close()
     return []

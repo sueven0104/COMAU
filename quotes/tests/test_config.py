@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from app import config
 
@@ -14,3 +15,13 @@ def test_defaults_and_env_override(monkeypatch, tmp_path):
     assert cfg["text_model"] == "my-model"      # 环境变量覆盖默认
     assert cfg["db_path_abs"].name == "x.db"     # 相对 quotes 根解析
     assert cfg["data_root_abs"].exists()
+
+
+def test_dotenv_fills_only_missing_vars(monkeypatch, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("# 注释\nQUOTES_DOTENV_PROBE=abc\nQUOTES_KEEP=from-file\n", encoding="utf-8")
+    monkeypatch.delenv("QUOTES_DOTENV_PROBE", raising=False)
+    monkeypatch.setenv("QUOTES_KEEP", "from-env")
+    config.load_dotenv(env)
+    assert os.environ["QUOTES_DOTENV_PROBE"] == "abc"
+    assert os.environ["QUOTES_KEEP"] == "from-env"  # 已有环境变量优先

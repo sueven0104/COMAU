@@ -1,7 +1,10 @@
 """结构化检索：QueryFilter 构造 SQL，大小写不敏感，支持日期区间与统计。"""
+import logging
 import re
 from dataclasses import dataclass
 from statistics import median
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class QueryFilter:
@@ -52,10 +55,12 @@ def _where(f: QueryFilter):
 
 def search(conn, f: QueryFilter, limit=200):
     q, args = _where(f)
-    return conn.execute(
+    rows = conn.execute(
         "SELECT quote_items.*, source_files.path AS source_path FROM quote_items "
         "LEFT JOIN source_files ON source_files.id=source_file_id"
         + q + " ORDER BY quote_date DESC LIMIT ?", (*args, limit)).fetchall()
+    log.debug("检索条件=%s 命中 %d 条（上限 %d）", f, len(rows), limit)
+    return rows
 
 def stats(conn, f: QueryFilter):
     rows = search(conn, f, limit=100000)

@@ -1,7 +1,10 @@
 """扫描数据目录：分类文件类型、计算内容哈希（幂等依据）、按顶层目录得项目代号。"""
 import hashlib
+import logging
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 SUPPORTED = {".msg", ".xlsx", ".pdf", ".png", ".jpg", ".jpeg", ".doc", ".pptx"}
 EXCLUDE_DIRS = {"quotes", "docs", "__pycache__", ".git", ".trae", "attachments"}
@@ -38,9 +41,17 @@ def scan_directory(root) -> tuple[list[FileRecord], list[str]]:
         # 跳过并记录，不中断整个扫描
         try:
             digest = file_hash(p)
-        except OSError:
+        except OSError as e:
+            log.warning("无法读取文件（被占用？），跳过：%s（%s）", p, e)
             skipped.append(str(p))
             continue
         project = rel.parts[0] if len(rel.parts) > 1 else "_root"
         records.append(FileRecord(str(p), p.suffix.lower(), project, digest))
+    by_type: dict[str, int] = {}
+    for r in records:
+        by_type[r.file_type] = by_type.get(r.file_type, 0) + 1
+    log.info("扫描 %s 完成：%d 个文件（%s），%d 个无法读取跳过",
+             root, len(records),
+             " ".join(f"{k}×{v}" for k, v in sorted(by_type.items())) or "空",
+             len(skipped))
     return records, skipped

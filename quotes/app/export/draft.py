@@ -1,7 +1,10 @@
 """报价建议草稿导出：原清单行 + 建议价 + 档位 + 依据 + 溯源 + 人工确认标记。"""
+import logging
 from pathlib import Path
 import openpyxl
 from openpyxl.styles import Font, PatternFill
+
+log = logging.getLogger(__name__)
 
 COLUMNS = ["行号", "产品", "规格", "品牌", "数量", "建议价", "价格区间",
            "匹配档位", "参考依据", "差异说明", "溯源", "需人工确认"]
@@ -37,4 +40,6 @@ def export_draft(conn, lines, matches, out_path):
     for col, width in zip("ABCDEFGHIJKL", [6, 22, 28, 12, 8, 12, 16, 10, 40, 36, 30, 10]):
         ws.column_dimensions[col].width = width
     wb.save(out_path)
+    n_confirm = sum(1 for m in matches if m.tier in NEED_CONFIRM)
+    log.info("草稿导出 %s：共 %d 行，其中需人工确认 %d 行", out_path, len(lines), n_confirm)
     return out_path

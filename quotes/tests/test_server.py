@@ -60,3 +60,11 @@ def test_files_and_review_endpoints(monkeypatch, tmp_path):
     assert tc.get("/api/review").status_code == 200
     meta = tc.get("/api/meta").json()
     assert "7-Axis" in meta["categories"] and "盛允" in meta["suppliers"]
+    assert meta["category_stats"][0]["count"] >= 1
+
+
+def test_static_assets(monkeypatch, tmp_path):
+    tc, _ = _client(monkeypatch, tmp_path)
+    assert tc.get("/").status_code == 200
+    assert tc.get("/static/assets/logo-mark.png").status_code == 200
+    assert tc.get("/favicon.ico").status_code == 200

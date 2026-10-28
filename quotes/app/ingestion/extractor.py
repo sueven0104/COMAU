@@ -1,7 +1,10 @@
 """LLM 结构化抽取：任意格式内容 → 统一 quote_items 记录（含重试）。"""
 import json
+import logging
 from .llm_client import LLMError
 from .normalize import validate_item
+
+log = logging.getLogger(__name__)
 
 SYSTEM_EXTRACT = """你是采购报价数据抽取助手，从汽车焊装线设备询价/报价内容中抽取每一条报价明细。
 只输出 JSON，不要任何解释。格式：
@@ -27,14 +30,20 @@ def extract_from_payload(client, file_label, payload_text, images=None,
             f"已知供应商：{','.join(known_suppliers) or '无'}\n\n"
             f"文件：{file_label}\n内容：\n{payload_text}")
     last_err = None
-    for _ in range(3):  # 初次 + 2 次重试
+    max_tries = 3
+    for attempt in range(1, max_tries + 1):  # 初次 + 2 次重试
         try:
             data = client.chat_json(SYSTEM_EXTRACT, hint, images=images)
             items = [validate_item(it)[0] for it in (data.get("items") or [])]
+            log.debug("抽取 %s：原始条目 %d 条", file_label, len(items))
             return {"items": items,
                     "email_terms": data.get("email_terms"),
                     "supplier_name": data.get("supplier_name")}
         except (json.JSONDecodeError, LLMError, KeyError, TypeError, AttributeError) as e:
             last_err = e
+            if attempt < max_tries:
+                log.warning("抽取解析失败（第 %d/%d 次），重试 %s：%s",
+                            attempt, max_tries, file_label, e)
             hint = f"{hint}\n\n[上次输出无法解析: {e}。请严格只输出一个合法 JSON 对象。]"
+    log.error("抽取最终失败 %s（已重试 %d 次）：%s", file_label, max_tries, last_err)
     raise LLMError(f"抽取失败 {file_label}: {last_err}")

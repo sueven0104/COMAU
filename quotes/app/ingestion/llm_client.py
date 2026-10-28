@@ -1,8 +1,12 @@
 """OpenAI 兼容 LLM 客户端（文本/视觉/embedding）+ 测试用 Fake。密钥来自环境变量。"""
 import base64
 import json
+import logging
 import re
+import time
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 class LLMError(Exception):
     pass
@@ -40,6 +44,8 @@ class LLMClient:
         self.text_model = cfg["text_model"]
         self.vision_model = cfg["vision_model"]
         self.embed_model = cfg["embed_model"]
+        log.info("LLM 客户端就绪：text=%s vision=%s embed=%s base_url=%s",
+                 self.text_model, self.vision_model, self.embed_model, cfg["base_url"])
 
     def chat(self, system: str, user: str, images=None) -> str:
         content = [{"type": "text", "text": user}]
@@ -48,21 +54,35 @@ class LLMClient:
             content.append({"type": "image_url",
                             "image_url": {"url": f"data:{_image_mime(img)};base64,{b64}"}})
         model = self.vision_model if images else self.text_model
-        resp = self.client.chat.completions.create(
-            model=model, temperature=0,
-            extra_body={"enable_thinking": False},  # 思考模型关闭思考，加快抽取
-            messages=[{"role": "system", "content": system},
-                      {"role": "user", "content": content}])
-        return resp.choices[0].message.content
+        t0 = time.perf_counter()
+        log.debug("LLM 请求 model=%s 输入 %d 字符 图片 %d 张",
+                  model, len(user), len(images or []))
+        try:
+            resp = self.client.chat.completions.create(
+                model=model, temperature=0,
+                extra_body={"enable_thinking": False},  # 思考模型关闭思考，加快抽取
+                messages=[{"role": "system", "content": system},
+                          {"role": "user", "content": content}])
+        except Exception as e:
+            log.error("LLM 调用失败 model=%s（耗时 %.1fs）：%s",
+                      model, time.perf_counter() - t0, e)
+            raise
+        out = resp.choices[0].message.content
+        log.debug("LLM 响应 model=%s 输出 %d 字符 耗时 %.1fs",
+                  model, len(out or ""), time.perf_counter() - t0)
+        return out
 
     def chat_json(self, system: str, user: str, images=None) -> dict:
         try:
             return parse_json_loose(self.chat(system, user, images))
         except (json.JSONDecodeError, ValueError) as e:
+            log.warning("LLM 返回内容无法解析为 JSON：%s", e)
             raise LLMError(f"LLM 返回内容无法解析为 JSON: {e}") from e
 
     def embed(self, texts) -> list:
-        resp = self.client.embeddings.create(model=self.embed_model, input=list(texts))
+        items = list(texts)
+        log.debug("embedding %d 段文本 model=%s", len(items), self.embed_model)
+        resp = self.client.embeddings.create(model=self.embed_model, input=items)
         return [d.embedding for d in resp.data]
 
 class FakeLLMClient:

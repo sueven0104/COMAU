@@ -1,6 +1,9 @@
 """SQLite 访问层：建表、source_files/quote_items 读写、检索。"""
+import logging
 import sqlite3
 from datetime import datetime, timezone
+
+log = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS source_files(
@@ -40,6 +43,7 @@ CREATE TABLE IF NOT EXISTS item_vectors(
 def connect(db_path) -> sqlite3.Connection:
     # check_same_thread=False：Web 服务（线程池）与测试 TestClient 需跨线程用同一连接；
     # 本地单用户、低并发场景下安全
+    log.debug("连接数据库 %s", db_path)
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

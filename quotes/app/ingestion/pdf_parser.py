@@ -1,7 +1,10 @@
 """PDF 文本层提取；无文本层（扫描版）标记 needs_vision，由管道渲染 PNG 走视觉模型。"""
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 import pymupdf as fitz
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class PdfContent:
@@ -17,6 +20,8 @@ def parse_pdf(path: Path, min_chars_per_page: int = 20) -> PdfContent:
     finally:
         doc.close()
     needs = (not pages) or sum(len(t) for t in pages) / len(pages) < min_chars_per_page
+    if needs:
+        log.debug("PDF 无有效文本层，转视觉模型抽取：%s（%d 页）", path.name, len(pages))
     return PdfContent(pages, needs)
 
 def render_pages_to_png(path: Path, out_dir: Path, dpi: int = 120) -> list[Path]:
@@ -30,6 +35,7 @@ def render_pages_to_png(path: Path, out_dir: Path, dpi: int = 120) -> list[Path]
             f = out_dir / f"page_{i + 1}.png"
             page.get_pixmap(dpi=dpi).save(f)
             outs.append(f)
+        log.debug("PDF 渲染 %d 页为 PNG（dpi=%d）：%s", len(outs), dpi, path.name)
         return outs
     finally:
         doc.close()

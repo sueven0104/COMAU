@@ -1,6 +1,9 @@
 """embedding 索引与余弦语义检索（数据量小，直接存 SQLite + Python 计算）。"""
 import json
+import logging
 import math
+
+log = logging.getLogger(__name__)
 
 def _item_text(r) -> str:
     return " | ".join(str(x) for x in
@@ -13,11 +16,13 @@ def ensure_vectors(conn, client):
            WHERE item_vectors.item_id IS NULL""").fetchall()
     if not rows:
         return
+    log.info("构建向量索引：%d 条条目待向量化", len(rows))
     vectors = client.embed([_item_text(r) for r in rows])
     conn.executemany(
         "INSERT OR REPLACE INTO item_vectors(item_id, text, vector) VALUES(?,?,?)",
         [(r["id"], _item_text(r), json.dumps(v)) for r, v in zip(rows, vectors)])
     conn.commit()
+    log.info("向量索引构建完成：新增 %d 条", len(vectors))
 
 def _cosine(a, b) -> float:
     num = sum(x * y for x, y in zip(a, b))
@@ -37,4 +42,9 @@ def semantic_search(conn, client, query: str, k=10):
     scored = sorted(
         ({"row": r, "score": _cosine(qv, json.loads(r["vector"]))} for r in rows),
         key=lambda x: -x["score"])
-    return [dict(s["row"]) for s in scored[:k]]
+    top = scored[:k]
+    if top:
+        log.debug("语义检索 %r：候选 %d 条，top1 相似度 %.3f",
+                  query, len(rows), top[0]["score"])
+    log.info("语义检索命中 %d 条（候选 %d）", len(top), len(rows))
+    return [dict(s["row"]) for s in top]
