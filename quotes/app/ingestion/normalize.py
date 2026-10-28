@@ -63,7 +63,7 @@ def validate_item(item: dict):
     warnings = []
     price = clean_number(item.get("unit_price"))
     qty = clean_number(item.get("qty"))
-    currency = (str(item["currency"]).strip().upper()
+    currency = ((str(item["currency"]).strip().upper() or None)
                 if item.get("currency") else None)
     tax = _clean_tax(item.get("tax_included"))
     status = normalize_price_status(item.get("price_status"))
@@ -94,9 +94,12 @@ def cross_check_totals(items, total_value, tol=0.05):
     """数量×单价 之和 与报价单合计交叉核对（无合计值时跳过）。"""
     if total_value is None:
         return []
-    calc = sum((i.get("qty") or 0) * (i.get("unit_price") or 0) for i in items)
-    if calc <= 0 or not items:
+    total = float(total_value)
+    if total <= 0 or not items:
         return []
-    if abs(calc - float(total_value)) / float(total_value) > tol:
+    calc = sum((i.get("qty") or 0) * (i.get("unit_price") or 0) for i in items)
+    if calc <= 0:
+        return []
+    if abs(calc - total) / total > tol:
         return [f"小计交叉核对不符: 计算值{calc:.0f} vs 合计{total_value}"]
     return []

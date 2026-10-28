@@ -7,6 +7,10 @@ from pathlib import Path
 class LLMError(Exception):
     pass
 
+def _image_mime(path) -> str:
+    return {".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(
+        Path(path).suffix.lower(), "image/png")
+
 def parse_json_loose(text: str) -> dict:
     t = text.strip()
     if t.startswith("```"):
@@ -14,7 +18,14 @@ def parse_json_loose(text: str) -> dict:
         t = parts[1] if len(parts) > 1 else t
         if t.startswith("json"):
             t = t[4:]
-    return json.loads(t.strip())
+    t = t.strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        start, end = t.find("{"), t.rfind("}")
+        if start == -1 or end == -1:
+            raise
+        return json.loads(t[start:end + 1])
 
 class LLMClient:
     def __init__(self, cfg: dict):
@@ -31,7 +42,7 @@ class LLMClient:
         for img in images or []:
             b64 = base64.b64encode(Path(img).read_bytes()).decode()
             content.append({"type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}"}})
+                            "image_url": {"url": f"data:{_image_mime(img)};base64,{b64}"}})
         model = self.vision_model if images else self.text_model
         resp = self.client.chat.completions.create(
             model=model, temperature=0,
@@ -40,7 +51,10 @@ class LLMClient:
         return resp.choices[0].message.content
 
     def chat_json(self, system: str, user: str, images=None) -> dict:
-        return parse_json_loose(self.chat(system, user, images))
+        try:
+            return parse_json_loose(self.chat(system, user, images))
+        except (json.JSONDecodeError, ValueError) as e:
+            raise LLMError(f"LLM 返回内容无法解析为 JSON: {e}") from e
 
     def embed(self, texts) -> list:
         resp = self.client.embeddings.create(model=self.embed_model, input=list(texts))

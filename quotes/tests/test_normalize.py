@@ -26,6 +26,13 @@ def test_validate_item_flags_missing_currency():
     assert item["needs_review"] is True          # 有价格但币种/含税未识别
     assert any("币种" in w or "含税" in w for w in warnings)
 
+def test_validate_item_blank_currency():
+    item, warnings = validate_item({"product_name": "七轴", "qty": 1,
+        "unit_price": 100.0, "currency": " ", "tax_included": True,
+        "price_status": "成交价"})
+    assert item["currency"] is None and item["needs_review"] is True
+    assert any("币种" in w for w in warnings)
+
 def test_validate_item_clean():
     item, warnings = validate_item({"supplier": "KUKA", "category": "7-Axis",
         "product_name": "七轴", "spec": "5m", "qty": 1, "unit_price": 100.0,
@@ -38,6 +45,10 @@ def test_cross_check():
     assert cross_check_totals(items, 250.0) == []                  # 偏差 0
     assert cross_check_totals(items, 300.0, tol=0.05)              # 偏差 20% -> 警告
     assert cross_check_totals(items, None) == []
+
+def test_cross_check_zero_total():
+    items = [{"qty": 2, "unit_price": 100.0}, {"qty": 1, "unit_price": 50.0}]
+    assert cross_check_totals(items, 0) == []                      # 合计为 0 跳过，不除零
 
 def test_seed_categories():
     assert "7-Axis" in SEED_CATEGORIES and len(SEED_CATEGORIES) >= 15
