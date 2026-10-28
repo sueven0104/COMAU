@@ -4,6 +4,7 @@
 !/quotes/
 !/docs/
 quotes/data/
+quotes/quotes.egg-info/
 quotes/__pycache__/
 **/__pycache__/
 *.pyc
