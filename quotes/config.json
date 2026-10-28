@@ -1,6 +1,6 @@
 {
   "text_model": "qwen3.8-flash",
-  "vision_model": "qwen-vl-max",
+  "vision_model": "qwen3.8-flash",
   "embed_model": "text-embedding-v3",
   "data_root": "../",
   "db_path": "data/quotes.db",
