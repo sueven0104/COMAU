@@ -20,9 +20,10 @@ def file_hash(p: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
-def scan_directory(root) -> list:
+def scan_directory(root) -> tuple[list[FileRecord], list[str]]:
     root = Path(root)
-    out = []
+    records: list[FileRecord] = []
+    skipped: list[str] = []
     for p in sorted(root.rglob("*")):
         if not p.is_file():
             continue
@@ -33,6 +34,13 @@ def scan_directory(root) -> list:
             continue
         if p.suffix.lower() not in SUPPORTED:
             continue
+        # 哈希算不出（如 Excel/PDF 被占用抛 PermissionError）的文件后续也无法解析，
+        # 跳过并记录，不中断整个扫描
+        try:
+            digest = file_hash(p)
+        except OSError:
+            skipped.append(str(p))
+            continue
         project = rel.parts[0] if len(rel.parts) > 1 else "_root"
-        out.append(FileRecord(str(p), p.suffix.lower(), project, file_hash(p)))
-    return out
+        records.append(FileRecord(str(p), p.suffix.lower(), project, digest))
+    return records, skipped

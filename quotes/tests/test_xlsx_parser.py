@@ -24,3 +24,11 @@ def test_parse_datetime_cells(tmp_path):
     f = tmp_path / "d.xlsx"; wb.save(f)
     sheets = parse_xlsx(f)
     assert sheets[0].rows[0] == ["2026-09-09", "2026-09-09 14:30:00", "1.5"]
+
+def test_parse_caps_rows_and_cols(tmp_path):
+    wb = openpyxl.Workbook(); ws = wb.active
+    for i in range(5):
+        ws.append([f"a{i}", f"b{i}", f"c{i}"])
+    f = tmp_path / "cap.xlsx"; wb.save(f)
+    sheets = parse_xlsx(f, max_rows=2, max_cols=2)
+    assert sheets[0].rows == [["a0", "b0"], ["a1", "b1"]]
