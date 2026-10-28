@@ -1,4 +1,5 @@
 """Excel 全 sheet 序列化为文本（结构判断交给 LLM 抽取）。"""
+import datetime
 from dataclasses import dataclass
 import openpyxl
 
@@ -10,6 +11,12 @@ class SheetData:
 def _cell(v) -> str:
     if v is None:
         return ""
+    if isinstance(v, datetime.datetime):  # datetime 是 date 的子类，须先判
+        if (v.hour, v.minute, v.second) == (0, 0, 0):
+            return v.strftime("%Y-%m-%d")
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(v, datetime.date):
+        return v.isoformat()
     if isinstance(v, float) and v == int(v):
         return str(int(v))
     return str(v)

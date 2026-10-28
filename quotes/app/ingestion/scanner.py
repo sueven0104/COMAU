@@ -27,7 +27,7 @@ def scan_directory(root) -> list:
         if not p.is_file():
             continue
         rel = p.relative_to(root)
-        if any(part in EXCLUDE_DIRS for part in rel.parts):
+        if any(part.lower() in EXCLUDE_DIRS for part in rel.parts):
             continue
         if p.name.startswith("~$") or p.name.startswith("."):
             continue

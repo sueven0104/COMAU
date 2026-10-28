@@ -16,3 +16,11 @@ def test_parse_serializes_all_sheets(tmp_path):
     assert sheets[0].name == "报价"
     assert sheets[0].rows[0] == ["设备", "数量", "单价"]
     assert sheets[0].rows[1] == ["七轴", "2", "47900"]  # 数字字符串化、整数去 .0
+
+def test_parse_datetime_cells(tmp_path):
+    import datetime as dt
+    wb = openpyxl.Workbook(); ws = wb.active
+    ws.append([dt.date(2026, 9, 9), dt.datetime(2026, 9, 9, 14, 30), 1.5])
+    f = tmp_path / "d.xlsx"; wb.save(f)
+    sheets = parse_xlsx(f)
+    assert sheets[0].rows[0] == ["2026-09-09", "2026-09-09 14:30:00", "1.5"]
