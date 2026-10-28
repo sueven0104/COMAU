@@ -9,7 +9,7 @@ DEFAULTS = {
     "text_model": "qwen-plus",
     "vision_model": "qwen-vl-max",
     "embed_model": "text-embedding-v3",
-    "data_root": "../",
+    "data_root": "../raw_data/",
     "db_path": "data/quotes.db",
     "confidence_threshold": 0.7,
 }

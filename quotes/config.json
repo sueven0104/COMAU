@@ -2,7 +2,7 @@
   "text_model": "qwen3.8-flash",
   "vision_model": "qwen3.8-flash",
   "embed_model": "text-embedding-v3",
-  "data_root": "../",
+  "data_root": "../raw_data/",
   "db_path": "data/quotes.db",
   "confidence_threshold": 0.7,
   "workers": 4
