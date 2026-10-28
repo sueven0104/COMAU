@@ -28,11 +28,15 @@ def parse_json_loose(text: str) -> dict:
         return json.loads(t[start:end + 1])
 
 class LLMClient:
+    # 单次调用超时（秒）：防止大 payload 下 SDK 默认 10 分钟超时 × 重试导致整夜卡死
+    REQUEST_TIMEOUT = 180
+
     def __init__(self, cfg: dict):
         if not cfg.get("api_key"):
             raise LLMError("缺少环境变量 QUOTES_API_KEY")
         from openai import OpenAI
-        self.client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"])
+        self.client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"],
+                             timeout=self.REQUEST_TIMEOUT, max_retries=1)
         self.text_model = cfg["text_model"]
         self.vision_model = cfg["vision_model"]
         self.embed_model = cfg["embed_model"]

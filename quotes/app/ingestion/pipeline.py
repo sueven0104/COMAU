@@ -12,23 +12,24 @@ from .llm_client import LLMClient
 from .normalize import SEED_CATEGORIES, normalize_supplier
 
 SKIP_TYPES = {".doc", ".pptx"}  # v1 暂不支持，进报告提示人工处理
+PAYLOAD_MAX_CHARS = 60_000      # 单文件 payload 上限：超限截断并记复核，防止超大表格拖垮 LLM
 
 def build_payload(rec, tmpdir):
-    """按类型构造 (payload_text, images)。"""
+    """按类型构造 (payload_text, images, truncated)。"""
     if rec.file_type == ".xlsx":
         sheets = xlsx_parser.parse_xlsx(rec.path)
         text = "\n\n".join(
             f"## Sheet {s.name}\n" + "\n".join(" | ".join(r) for r in s.rows)
             for s in sheets)
-        return text, None
+        return text, None, False
     if rec.file_type == ".pdf":
         pdf = pdf_parser.parse_pdf(rec.path)
         if not pdf.needs_vision:
-            return "\n\n".join(f"## 第{i+1}页\n{t}" for i, t in enumerate(pdf.pages)), None
+            return "\n\n".join(f"## 第{i+1}页\n{t}" for i, t in enumerate(pdf.pages)), None, False
         imgs = pdf_parser.render_pages_to_png(rec.path, Path(tmpdir) / "pdf_pages")
-        return "这是一份报价单 PDF，请从图片中完整抽取报价明细。", imgs
+        return "这是一份报价单 PDF，请从图片中完整抽取报价明细。", imgs, False
     if rec.file_type in (".png", ".jpg", ".jpeg"):
-        return "这是一张报价/价格截图，请抽取其中全部价格信息。", [rec.path]
+        return "这是一张报价/价格截图，请抽取其中全部价格信息。", [rec.path], False
     raise ValueError(f"unsupported {rec.file_type}")
 
 def build_email_map(records, tmpdir):
@@ -58,13 +59,14 @@ def run_ingestion(root, conn, client, report_path, threshold=0.7):
         known_categories = sorted(set(known_categories + SEED_CATEGORIES))
         known_suppliers = sorted({r["name"] for r in conn.execute("SELECT name FROM suppliers")})
 
-        for rec in records:
+        for idx, rec in enumerate(records, 1):
             existing = db.existing_file(conn, rec.path)
             if existing and existing["content_hash"] == rec.content_hash:
                 continue  # 幂等：未变化文件跳过
             if rec.file_type in SKIP_TYPES:
                 review_rows.append([rec.path, "SKIP", "v1 暂不支持该格式，请人工处理"])
                 continue
+            print(f"[{idx}/{len(records)}] {Path(rec.path).name}", flush=True)
             try:
                 if rec.file_type == ".msg":
                     em = meta_map.get(rec.path) or msg_parser.parse_msg(
@@ -74,8 +76,12 @@ def run_ingestion(root, conn, client, report_path, threshold=0.7):
                     images = None
                     email_meta = em
                 else:
-                    payload, images = build_payload(rec, tmpdir)
+                    payload, images, _ = build_payload(rec, tmpdir)
                     email_meta = att_map.get(Path(rec.path).name.lower())
+                if len(payload) > PAYLOAD_MAX_CHARS:
+                    payload = payload[:PAYLOAD_MAX_CHARS]
+                    review_rows.append([rec.path, "TRUNCATED",
+                                        f"内容超 {PAYLOAD_MAX_CHARS} 字符已截断，可能遗漏后半部分条目"])
                 out = extract_from_payload(client, Path(rec.path).name, payload,
                                            images=images,
                                            known_categories=known_categories,
