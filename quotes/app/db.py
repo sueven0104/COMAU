@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS item_vectors(
 """
 
 def connect(db_path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # check_same_thread=False：Web 服务（线程池）与测试 TestClient 需跨线程用同一连接；
+    # 本地单用户、低并发场景下安全
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
