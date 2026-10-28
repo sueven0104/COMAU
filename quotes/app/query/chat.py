@@ -27,6 +27,10 @@ def _fmt_row(r) -> str:
             f"{r['price_status']} | {r['quote_date'] or ''} | "
             f"[来源:{name} {r['source_location'] or ''}]")
 
+def _cats(conn) -> list:
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT category FROM quote_items WHERE category IS NOT NULL")]
+
 def _vocab(conn) -> str:
     cats = [r[0] for r in conn.execute(
         "SELECT DISTINCT category FROM quote_items WHERE category IS NOT NULL")]
@@ -38,12 +42,31 @@ def _vocab(conn) -> str:
             f"供应商：{'、'.join(sups)}\n"
             f"项目：{'、'.join(projs)}")
 
+def _category_fallback(conn, client, question: str, cats: list) -> list:
+    """0 命中时的品类兜底：让 LLM 把口语品类词归一到库内标准品类后重查。"""
+    if not cats:
+        return []
+    try:
+        out = client.chat_json(
+            "从品类列表中为问题选择最相关的若干品类，只输出JSON:"
+            "{\"categories\":[\"...\"]}；无合适则输出空数组。",
+            f"品类列表：{'、'.join(cats)}\n问题：{question}")
+        cs = [c for c in (out.get("categories") or []) if c in cats]
+    except Exception:
+        return []
+    if not cs:
+        return []
+    return [dict(r) for r in retriever.search(
+        conn, retriever.QueryFilter(categories=cs))]
+
 def answer_question(conn, client, question: str) -> dict:
     intent = client.chat_json(
         SYSTEM_INTENT.format(today=date.today().isoformat(), vocab=_vocab(conn)),
         question)
     f = retriever.filter_from_dict(intent)
     rows = [dict(r) for r in retriever.search(conn, f)]
+    if not rows:  # 品类兜底：口语词与标准品类不一致（如"激光打码"→"Marking 打码"）
+        rows = _category_fallback(conn, client, question, _cats(conn))
     if not rows:  # 语义兜底
         try:
             rows = semantic_search(conn, client, question)

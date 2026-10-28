@@ -45,3 +45,19 @@ def test_projects_filter_no_ambiguous_column():
     rows = retriever.search(conn, retriever.QueryFilter(projects=["baic"]))
     assert len(rows) == 2
     assert all(r["source_path"] == "D:/a.xlsx" for r in rows)
+
+def test_keyword_terms_or_match():
+    # 多词 keyword 按空格分词后 OR 匹配：词分布在不同列也能召回
+    conn = db.connect(":memory:")
+    fid = db.upsert_source_file(conn, {
+        "path": "D:/a.xlsx", "content_hash": "h", "file_type": ".xlsx",
+        "project_code": "BAIC", "email_subject": None, "email_from": None,
+        "email_date": None, "email_body": None, "processed_at": db.now()})
+    db.insert_quote_items(conn, fid, "BAIC", [
+        {"supplier": "伏能士", "category": "Arc Welding", "product_name": "Welding Package CMT",
+         "spec": "焊机", "brand": "Fronius", "model": None, "qty": 1, "unit": "套",
+         "unit_price": 1.0, "currency": "CNY", "tax_included": True,
+         "price_status": "本次报价", "quote_date": None, "terms": None,
+         "source_location": None, "confidence": 0.9, "needs_review": 0}])
+    rows = retriever.search(conn, retriever.QueryFilter(keyword="Fronius CMT"))
+    assert len(rows) == 1   # 两词分列存放，OR 匹配召回

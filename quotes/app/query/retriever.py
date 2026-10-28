@@ -1,4 +1,5 @@
 """结构化检索：QueryFilter 构造 SQL，大小写不敏感，支持日期区间与统计。"""
+import re
 from dataclasses import dataclass
 from statistics import median
 
@@ -39,8 +40,14 @@ def _where(f: QueryFilter):
     if f.date_to:
         q += " AND quote_items.quote_date<=?"; args.append(f.date_to)
     if f.keyword:
-        q += " AND (quote_items.product_name LIKE ? OR quote_items.spec LIKE ? OR quote_items.brand LIKE ?)"
-        args += [f"%{f.keyword}%"] * 3
+        # 多词 keyword 按空格分词 OR 匹配：词可能分布在不同列（如 brand=Fronius + name=CMT）
+        terms = [t for t in re.split(r"\s+", f.keyword.strip()) if t] or [f.keyword]
+        conds = []
+        for t in terms:
+            conds.append("(quote_items.product_name LIKE ? OR quote_items.spec LIKE ? "
+                         "OR quote_items.brand LIKE ?)")
+            args += [f"%{t}%"] * 3
+        q += " AND (" + " OR ".join(conds) + ")"
     return q, args
 
 def search(conn, f: QueryFilter, limit=200):

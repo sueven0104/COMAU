@@ -30,9 +30,21 @@ def test_answer_with_citation():
 
 def test_no_result_falls_back_to_semantic():
     conn = _seed()
-    # 意图过滤无命中 -> 走语义兜底（向量：item0 与查询同向、item1 正交）；再由 LLM 汇总
+    # 意图过滤无命中 -> 品类兜底也无果 -> 走语义兜底（向量：item0 与查询同向、item1 正交）
     fake = FakeLLMClient(
-        chat_responses=[{"categories": ["不存在的品类"]}, "语义兜底找到相关记录 100 元"],
+        chat_responses=[{"categories": ["不存在的品类"]}, {"categories": []},
+                        "语义兜底找到相关记录 100 元"],
         embed_responses=[[[1.0, 0.0], [0.0, 1.0]], [[1.0, 0.0]]])
     out = chat.answer_question(conn, fake, "机器人第七轴多少钱")
     assert out["matched_count"] >= 1
+
+def test_no_result_falls_back_to_category():
+    conn = _seed()
+    # 意图无命中 -> 品类兜底把口语词归一到库内品类 -> 命中
+    fake = FakeLLMClient(
+        chat_responses=[{"categories": ["七轴不存在"]},
+                        {"categories": ["7-Axis"]},
+                        "七轴品类兜底命中 100 元"])
+    out = chat.answer_question(conn, fake, "机器人第七轴多少钱")
+    assert out["matched_count"] == 1
+    assert "100" in out["answer"]
