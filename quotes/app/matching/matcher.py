@@ -85,11 +85,15 @@ def match_line(conn, line, client=None) -> MatchResult:
     exact_same_brand = [c for c, s in scored if s >= 0.5]
     similar = [c for c, s in scored if 0.25 <= s < 0.5] or exact_same_brand
     prefer = lambda lst: sorted(
-        lst, key=lambda c: (c["price_status"] != "成交价", -(c["quote_date"] or "")))[0]
+        _by_recent(lst), key=lambda c: c["price_status"] != "成交价")[0]
+
+    def _by_recent(lst):
+        # 日期字符串降序（新报价优先），供后续稳定排序作次级键
+        return sorted(lst, key=lambda c: c["quote_date"] or "", reverse=True)
 
     def basis_of(lst):
         seen, parts = set(), []
-        for c in sorted(lst, key=lambda x: (x["price_status"] != "成交价", -(x["quote_date"] or ""))):
+        for c in sorted(_by_recent(lst), key=lambda x: x["price_status"] != "成交价"):
             key = (c["project_code"], c["supplier"], c["price_status"])
             if key not in seen:
                 seen.add(key)
