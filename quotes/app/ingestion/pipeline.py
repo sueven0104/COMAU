@@ -15,10 +15,10 @@ from .normalize import SEED_CATEGORIES, normalize_supplier
 SKIP_TYPES = {".doc", ".pptx"}  # v1 暂不支持，进报告提示人工处理
 PAYLOAD_MAX_CHARS = 60_000      # 单文件 payload 上限：超限截断并记复核，防止超大表格拖垮 LLM
 
-def build_payload(rec, tmpdir):
+def build_payload(rec, tmpdir, max_rows=400):
     """按类型构造 (payload_text, images, truncated)。"""
     if rec.file_type == ".xlsx":
-        sheets = xlsx_parser.parse_xlsx(rec.path)
+        sheets = xlsx_parser.parse_xlsx(rec.path, max_rows=max_rows)
         text = "\n\n".join(
             f"## Sheet {s.name}\n" + "\n".join(" | ".join(r) for r in s.rows)
             for s in sheets)
@@ -48,7 +48,8 @@ def build_email_map(records, tmpdir):
             att_map[a.name.lower()] = em
     return att_map, meta_map
 
-def run_ingestion(root, conn, client, report_path, threshold=0.7, workers=1):
+def run_ingestion(root, conn, client, report_path, threshold=0.7, workers=1,
+                  payload_max_chars=PAYLOAD_MAX_CHARS, xlsx_max_rows=400):
     records, skipped = scanner.scan_directory(root)
     review_rows, failures, n_items = [], [], 0
     for p in skipped:  # 扫描期哈希失败的文件进报告，避免静默丢失
@@ -68,11 +69,11 @@ def run_ingestion(root, conn, client, report_path, threshold=0.7, workers=1):
             else:
                 # 每文件独立子目录，避免并行渲染 PDF 页图时同名覆盖
                 payload, images, _ = build_payload(
-                    rec, Path(tmpdir) / f"file_{work_idx}")
+                    rec, Path(tmpdir) / f"file_{work_idx}", max_rows=xlsx_max_rows)
                 email_meta = att_map.get(Path(rec.path).name.lower())
-            truncated = len(payload) > PAYLOAD_MAX_CHARS
+            truncated = len(payload) > payload_max_chars
             if truncated:
-                payload = payload[:PAYLOAD_MAX_CHARS]
+                payload = payload[:payload_max_chars]
             out = extract_from_payload(client, Path(rec.path).name, payload,
                                        images=images,
                                        known_categories=known_categories,
@@ -119,7 +120,7 @@ def run_ingestion(root, conn, client, report_path, threshold=0.7, workers=1):
                 continue
             if res["truncated"]:
                 review_rows.append([rec.path, "TRUNCATED",
-                                    f"内容超 {PAYLOAD_MAX_CHARS} 字符已截断，可能遗漏后半部分条目"])
+                                    f"内容超 {payload_max_chars} 字符已截断，可能遗漏后半部分条目"])
             out = res["out"]
             email_meta = res["email_meta"]
             items = out["items"]
@@ -179,6 +180,10 @@ def main():
     ap.add_argument("--report", default=None)
     ap.add_argument("--workers", type=int, default=None,
                     help="并行抽取线程数（默认取 config 的 workers，缺省 1）")
+    ap.add_argument("--payload-max", type=int, default=None,
+                    help="单文件 payload 字符上限（默认 60000，超大表格可调小）")
+    ap.add_argument("--xlsx-max-rows", type=int, default=None,
+                    help="xlsx 每 sheet 最大行数（默认 400）")
     args = ap.parse_args()
     cfg = load_config()
     root = args.root or cfg["data_root_abs"]
@@ -189,7 +194,9 @@ def main():
     client = LLMClient(cfg)
     run_ingestion(root, conn, client, report,
                   threshold=cfg["confidence_threshold"],
-                  workers=args.workers or cfg.get("workers", 1))
+                  workers=args.workers or cfg.get("workers", 1),
+                  payload_max_chars=args.payload_max or PAYLOAD_MAX_CHARS,
+                  xlsx_max_rows=args.xlsx_max_rows or 400)
 
 if __name__ == "__main__":
     main()
