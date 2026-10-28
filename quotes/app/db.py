@@ -54,8 +54,7 @@ def upsert_source_file(conn, rec: dict) -> int:
              email_date=excluded.email_date, email_body=excluded.email_body,
              processed_at=excluded.processed_at
            RETURNING id""", rec)
-    row = cur.fetchone()  # RETURNING 需先取回结果再 commit，否则游标仍处活动状态
-    conn.commit()
+    row = cur.fetchone()  # RETURNING 需先取回结果；commit 由调用方（事务边界）负责
     return row[0]
 
 def existing_file(conn, path):
@@ -85,8 +84,8 @@ def insert_quote_items(conn, source_file_id: int, project_code: str, items: list
     return ids
 
 def delete_items_for_file(conn, source_file_id: int):
+    # 不在函数内 commit：与 upsert/insert 由调用方包在同一事务中，保证原子性
     conn.execute("DELETE FROM quote_items WHERE source_file_id=?", (source_file_id,))
-    conn.commit()
 
 def count_items(conn, source_file_id=None) -> int:
     if source_file_id is None:

@@ -48,72 +48,79 @@ def build_email_map(records, tmpdir):
 
 def run_ingestion(root, conn, client, report_path, threshold=0.7):
     records, skipped = scanner.scan_directory(root)
-    tmpdir = tempfile.mkdtemp(prefix="quotes_")
-    att_map, meta_map = build_email_map(records, tmpdir)
-    known_categories = [r[0] for r in conn.execute(
-        "SELECT DISTINCT category FROM quote_items WHERE category IS NOT NULL")]
-    known_categories = sorted(set(known_categories + SEED_CATEGORIES))
-    known_suppliers = sorted({r["name"] for r in conn.execute("SELECT name FROM suppliers")})
     review_rows, failures, n_items = [], [], 0
+    for p in skipped:  # 扫描期哈希失败的文件进报告，避免静默丢失
+        review_rows.append([p, "SKIP", "无法读取文件（被占用？）"])
+    with tempfile.TemporaryDirectory(prefix="quotes_") as tmpdir:
+        att_map, meta_map = build_email_map(records, tmpdir)
+        known_categories = [r[0] for r in conn.execute(
+            "SELECT DISTINCT category FROM quote_items WHERE category IS NOT NULL")]
+        known_categories = sorted(set(known_categories + SEED_CATEGORIES))
+        known_suppliers = sorted({r["name"] for r in conn.execute("SELECT name FROM suppliers")})
 
-    for rec in records:
-        existing = db.existing_file(conn, rec.path)
-        if existing and existing["content_hash"] == rec.content_hash:
-            continue  # 幂等：未变化文件跳过
-        if rec.file_type in SKIP_TYPES:
-            review_rows.append([rec.path, "SKIP", "v1 暂不支持该格式，请人工处理"])
-            continue
-        try:
-            if rec.file_type == ".msg":
-                em = meta_map.get(rec.path) or msg_parser.parse_msg(
-                    rec.path, Path(tmpdir) / "emails" / Path(rec.path).stem)
-                payload = (f"邮件主题:{em.subject}\n发件人:{em.sender}\n"
-                           f"日期:{em.date}\n正文:\n{em.body}")
-                images = None
-                email_meta = em
-            else:
-                payload, images = build_payload(rec, tmpdir)
-                email_meta = att_map.get(Path(rec.path).name.lower())
-            out = extract_from_payload(client, Path(rec.path).name, payload,
-                                       images=images,
-                                       known_categories=known_categories,
-                                       known_suppliers=known_suppliers)
-            items = out["items"]
-            supplier_name = normalize_supplier(out["supplier_name"], known_suppliers) \
-                if out["supplier_name"] else None
-            email_terms = out["email_terms"] or (
-                email_meta.body[:200] if email_meta else None)
-            for it in items:
-                if supplier_name and not it.get("supplier"):
-                    it["supplier"] = supplier_name
-                if email_terms and not it.get("terms"):
-                    it["terms"] = email_terms
-                it["confidence"] = 0.9 if not it.get("needs_review") else 0.5
-                if it.get("confidence", 1) < threshold:
-                    it["needs_review"] = True
-            sf_id = db.upsert_source_file(conn, {
-                "path": rec.path, "content_hash": rec.content_hash,
-                "file_type": rec.file_type, "project_code": rec.project_code,
-                "email_subject": email_meta.subject if email_meta else None,
-                "email_from": email_meta.sender if email_meta else None,
-                "email_date": email_meta.date if email_meta else None,
-                "email_body": (email_meta.body or None) if email_meta else None,
-                "processed_at": db.now()})
-            db.delete_items_for_file(conn, sf_id)
-            db.insert_quote_items(conn, sf_id, rec.project_code, items)
-            if supplier_name:
-                conn.execute("INSERT OR IGNORE INTO suppliers(name) VALUES(?)",
-                             (supplier_name,))
-                conn.commit()
-            for it in items:
-                if it.get("needs_review"):
-                    review_rows.append([rec.path, it.get("source_location", ""),
-                                        f"{it.get('product_name','')} "
-                                        f"{it.get('unit_price','')} 需复核"])
-            n_items += len(items)
-        except Exception as e:  # 断点续跑：单文件失败记录后继续，不中断整体
-            failures.append((rec.path, str(e)))
-            review_rows.append([rec.path, "ERROR", str(e)[:200]])
+        for rec in records:
+            existing = db.existing_file(conn, rec.path)
+            if existing and existing["content_hash"] == rec.content_hash:
+                continue  # 幂等：未变化文件跳过
+            if rec.file_type in SKIP_TYPES:
+                review_rows.append([rec.path, "SKIP", "v1 暂不支持该格式，请人工处理"])
+                continue
+            try:
+                if rec.file_type == ".msg":
+                    em = meta_map.get(rec.path) or msg_parser.parse_msg(
+                        rec.path, Path(tmpdir) / "emails" / Path(rec.path).stem)
+                    payload = (f"邮件主题:{em.subject}\n发件人:{em.sender}\n"
+                               f"日期:{em.date}\n正文:\n{em.body}")
+                    images = None
+                    email_meta = em
+                else:
+                    payload, images = build_payload(rec, tmpdir)
+                    email_meta = att_map.get(Path(rec.path).name.lower())
+                out = extract_from_payload(client, Path(rec.path).name, payload,
+                                           images=images,
+                                           known_categories=known_categories,
+                                           known_suppliers=known_suppliers)
+                items = out["items"]
+                supplier_name = normalize_supplier(out["supplier_name"], known_suppliers) \
+                    if out["supplier_name"] else None
+                email_terms = out["email_terms"] or (
+                    email_meta.body[:200] if email_meta else None)
+                for it in items:
+                    if supplier_name and not it.get("supplier"):
+                        it["supplier"] = supplier_name
+                    if email_terms and not it.get("terms"):
+                        it["terms"] = email_terms
+                    it["confidence"] = 0.9 if not it.get("needs_review") else 0.5
+                    if it.get("confidence", 1) < threshold:
+                        it["needs_review"] = True
+                # upsert→delete→insert 单事务：中途失败整体回滚，避免新哈希已入库而条目为空
+                with conn:
+                    sf_id = db.upsert_source_file(conn, {
+                        "path": rec.path, "content_hash": rec.content_hash,
+                        "file_type": rec.file_type, "project_code": rec.project_code,
+                        "email_subject": email_meta.subject if email_meta else None,
+                        "email_from": email_meta.sender if email_meta else None,
+                        "email_date": email_meta.date if email_meta else None,
+                        "email_body": (email_meta.body or None) if email_meta else None,
+                        "processed_at": db.now()})
+                    db.delete_items_for_file(conn, sf_id)
+                    db.insert_quote_items(conn, sf_id, rec.project_code, items)
+                    if supplier_name:
+                        conn.execute("INSERT OR IGNORE INTO suppliers(name) VALUES(?)",
+                                     (supplier_name,))
+                if email_meta is None:  # 非 .msg 未关联到邮件，降级需可见
+                    review_rows.append([rec.path, "LINK", "未关联到任何邮件，条款缺失请人工核对"])
+                for it in items:
+                    if it.get("needs_review"):
+                        reason = ("置信度低于阈值"
+                                  if it.get("confidence", 1) < threshold else "需复核")
+                        review_rows.append([rec.path, it.get("source_location", ""),
+                                            f"{it.get('product_name','')} "
+                                            f"{it.get('unit_price','')} {reason}"])
+                n_items += len(items)
+            except Exception as e:  # 断点续跑：单文件失败记录后继续，不中断整体
+                failures.append((rec.path, str(e)))
+                review_rows.append([rec.path, "ERROR", str(e)[:200]])
 
     report_path = Path(report_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)

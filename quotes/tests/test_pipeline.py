@@ -49,8 +49,17 @@ def test_pipeline_ingests_and_is_idempotent(tmp_path, monkeypatch):
     sf = conn.execute("SELECT email_subject FROM source_files WHERE path LIKE '%冠宇%'").fetchone()
     assert sf["email_subject"] == "回复: 询价-滚床"    # 附件文件带邮件元数据
 
-    # 幂等：哈希未变 -> 不再调用 LLM、不重复入库（fake2 无响应，若被调用会抛"响应已耗尽"）
+    # 幂等：哈希未变 -> 不再调用 LLM、不重复入库。
+    # 旧版仅靠 fake2 响应耗尽抛错保护，但异常会被管道 except 吞掉导致假绿；
+    # 这里额外对 chat_json 计数，硬断言未变化文件不触发任何 LLM 调用。
     fake2 = FakeLLMClient(chat_responses=[])
+    calls = []
+    orig_chat = fake2.chat_json
+    def _counting(*a, **k):
+        calls.append(1)
+        return orig_chat(*a, **k)
+    fake2.chat_json = _counting
     pipeline.run_ingestion(tmp_path, conn, fake2, tmp_path / "review2.csv")
     assert db.count_items(conn) == 1
+    assert not calls   # 未变化文件不得触发任何 LLM 调用
     assert (tmp_path / "review.csv").exists()
