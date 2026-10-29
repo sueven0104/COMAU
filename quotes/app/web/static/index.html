@@ -173,8 +173,6 @@
   .intro h1 em{font-style:normal;color:var(--violet-2)}
   .intro h1 .stop{color:var(--violet)}
   .intro .lede{margin-top:10px;font-size:12.5px;line-height:1.65;color:var(--dim);max-width:400px}
-  .intro .lede b{color:#e7def8;font-family:var(--mono);font-size:12.5px}
-  .intro .lede .scope{margin:0 .22em;color:#e7def8}
   .intro-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
   .intro-actions .btn{padding:9px 18px;font-size:13px}
 
@@ -272,8 +270,18 @@
   .md-list li::marker{color:var(--violet-2)}
   .md-table-wrap{overflow-x:auto;margin:10px 0}
   .md-table{width:100%;border-collapse:collapse;font-size:11.5px}
-  .md-table th,.md-table td{border-bottom:1px solid var(--line);padding:6px 9px;text-align:left}
+  .md-table th,.md-table td{border-bottom:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
   .md-table th{background:rgba(226,219,246,.05);color:#d8ccf0;font-weight:500;white-space:nowrap}
+  .md-table .col-proj,.md-table .col-price,.md-table .col-status,.md-table .col-src{white-space:nowrap}
+  .md-table .col-sup{min-width:70px}
+  .md-table .col-price{font-family:var(--mono);font-variant-numeric:tabular-nums;color:#efe7ff}
+  .md-table .col-src{width:46px;text-align:center;padding-left:4px;padding-right:4px}
+  .cite-ref{
+    display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:6px;
+    border:1px solid rgba(160,113,255,.38);background:rgba(160,113,255,.12);color:var(--violet-3);
+    font-family:var(--mono);font-size:10px;line-height:1;cursor:pointer;transition:.2s;vertical-align:super;
+  }
+  .cite-ref:hover{border-color:var(--violet-2);background:rgba(160,113,255,.26);color:#fff}
   .cite-inline{
     display:inline-block;margin:0 3px;padding:0 6px;border-radius:5px;font-family:var(--mono);font-size:10px;
     color:var(--violet-3);background:rgba(160,113,255,.08);border:1px solid rgba(160,113,255,.18);
@@ -704,7 +712,7 @@
       <aside class="intro">
         <span class="eyebrow">quote intelligence · local knowledge base</span>
         <h1>把历史报价<br>问成<em>一句话</em><span class="stop">.</span></h1>
-        <p class="lede" id="heroLede">覆盖本地知识库的历史报价。用自然语言提问，答案带来源文件与位置。</p>
+        <p class="lede">基于本地报价知识库，用自然语言提问，答案带来源文件与位置。</p>
 
         <div class="intro-actions">
           <button type="button" class="btn btn-primary" id="heroAsk">
@@ -1154,13 +1162,42 @@
       .replace(/\[来源[:：]\s*([^\]]+)\]/g, '<span class="cite-inline">$1</span>');
   }
 
-  function renderAnswer(raw) {
+  /* 表格「来源」单元格 → 溯源角标：与下方 citations 顺序一一对应 */
+  function clipName(name, n) {
+    name = String(name || '');
+    return name.length <= n ? name : name.slice(0, n - 1).trimEnd() + '…';
+  }
+
+  function citeIndexOf(rawCell, cites) {
+    const t = String(rawCell || '')
+      .replace(/^\[?来源[:：]\s*/, '').replace(/\]$/, '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!t || !cites || !cites.length) return -1;
+    for (let i = 0; i < cites.length; i++) {
+      const name = basename(cites[i].source_path || '').toLowerCase();
+      const loc = String(cites[i].source_location || '').toLowerCase().trim();
+      if ((name + (loc ? ' ' + loc : '')).trim() === t) return i;
+      const key = clipName(name, 24).toLowerCase().replace(/…$/, '');
+      if (key && t.startsWith(key) && (!loc || t.endsWith(loc))) return i;
+    }
+    return -1;
+  }
+
+  function renderAnswer(raw, cites) {
     const text = esc(raw || '');
     const lines = text.split(/\r?\n/);
     const out = [];
     let i = 0;
     const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l || '');
     const splitRow = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+    const colClass = (h) => {
+      if (/单价|价格|金额/.test(h)) return 'col-price';
+      if (/状态|日期/.test(h)) return 'col-status';
+      if (/项目/.test(h)) return 'col-proj';
+      if (/供应商/.test(h)) return 'col-sup';
+      if (/来源/.test(h)) return 'col-src';
+      return '';
+    };
     while (i < lines.length) {
       const line = lines[i];
       if (!line.trim()) { i++; continue; }
@@ -1172,10 +1209,24 @@
           rows.push(splitRow(lines[i]));
           i++;
         }
+        const cls = head.map(colClass);
+        const cellHTML = (c, n) => {
+          const v = c == null ? '' : c;
+          if (cls[n] === 'col-src') {
+            const idx = citeIndexOf(v, cites);
+            if (idx >= 0) {
+              const cite = cites[idx];
+              const tip = basename(cite.source_path) + (cite.source_location ? ' · ' + cite.source_location : '');
+              return '<td class="col-src"><button type="button" class="cite-ref" data-cite="' +
+                encodeURIComponent(JSON.stringify(cite)) + '" title="' + esc(tip) + '">' + (idx + 1) + '</button></td>';
+            }
+          }
+          return '<td' + (cls[n] ? ' class="' + cls[n] + '"' : '') + '>' + inlineFmt(v) + '</td>';
+        };
         out.push('<div class="md-table-wrap"><table class="md-table"><thead><tr>' +
-          head.map((h) => '<th>' + inlineFmt(h) + '</th>').join('') +
+          head.map((h, n) => '<th' + (cls[n] ? ' class="' + cls[n] + '"' : '') + '>' + inlineFmt(h) + '</th>').join('') +
           '</tr></thead><tbody>' +
-          rows.map((r) => '<tr>' + r.map((c) => '<td>' + inlineFmt(c) + '</td>').join('') + '</tr>').join('') +
+          rows.map((r) => '<tr>' + r.map(cellHTML).join('') + '</tr>').join('') +
           '</tbody></table></div>');
         continue;
       }
@@ -1219,9 +1270,9 @@
 
   function citesHTML(cites) {
     if (!cites || !cites.length) return '';
-    const chips = cites.slice(0, 8).map((c) =>
+    const chips = cites.slice(0, 8).map((c, n) =>
       '<button type="button" class="cite-chip" data-cite="' + encodeURIComponent(JSON.stringify(c)) + '" title="查看来源详情">' +
-        '<span class="hash">#' + esc(c.item_id) + '</span>' +
+        '<span class="hash">' + (n + 1) + '</span>' +
         '<span class="cite-file">' + esc(basename(c.source_path)) + '</span>' +
         '<span class="cite-loc">' + esc(c.source_location || '') + '</span>' +
       '</button>'
@@ -1293,7 +1344,7 @@
     el.className = 'msg bot';
     const matched = data.matched_count == null ? 0 : data.matched_count;
     el.innerHTML = '<div class="avatar"><span class="mark" aria-hidden="true"></span></div><div class="stack">' +
-      '<div class="bubble">' + renderAnswer(data.answer) + '</div>' +
+      '<div class="bubble">' + renderAnswer(data.answer, data.citations) + '</div>' +
       '<div class="msg-meta"><span class="ok">已完成</span><span>命中 ' + fmtInt.format(matched) + ' 条</span><span>' + secs + 's</span></div>' +
       citesHTML(data.citations) +
     '</div>';
@@ -1643,18 +1694,6 @@
     ).join('');
   }
 
-  function renderHeroLede(projects, total) {
-    const el = $('#heroLede');
-    if (!el) return;
-    const names = projects.slice(0, 3).map(esc);
-    const listed = names.join('、');
-    const scope = projects.length > 3
-      ? listed + ' 等 ' + projects.length + ' 个项目'
-      : (listed || '本地知识库');
-    const count = total ? ' <b>' + fmtInt.format(total) + '</b> 条' : '';
-    el.innerHTML = '覆盖<span class="scope">' + scope + '</span>的' + count + '历史报价。用自然语言提问，答案带来源文件与位置。';
-  }
-
   async function loadOverview() {
     const results = await Promise.allSettled([
       api('/api/files'), api('/api/review'), api('/api/meta')
@@ -1679,7 +1718,6 @@
     countUp('dFiles', state.files.length);
     countUp('dItems', state.itemTotal);
     countUp('dReview', state.review.length);
-    renderHeroLede(projectNames, state.itemTotal);
     setText('filesCount', fmtInt.format(state.files.length));
     setText('reviewCount', fmtInt.format(state.review.length));
     renderHeroCats(state.meta && state.meta.category_stats);
@@ -1792,7 +1830,7 @@
       toast('会话已清空');
     });
     $('#chatLog').addEventListener('click', (e) => {
-      const chip = e.target.closest('.cite-chip');
+      const chip = e.target.closest('.cite-chip, .cite-ref');
       if (chip) openCite(chip.getAttribute('data-cite'));
     });
 
