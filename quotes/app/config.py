@@ -22,7 +22,8 @@ def load_dotenv(path=None) -> None:
     p = Path(path) if path else ROOT / ".env"
     if not p.exists():
         return
-    for raw in p.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig：兼容用户编辑器保存 .env 时带上 BOM 的情况
+    for raw in p.read_text(encoding="utf-8-sig").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

@@ -1,6 +1,7 @@
 # 白名单：只跟踪代码与文档，机密商务数据(价格)不入库
 /*
 !/.gitignore
+!/.gitattributes
 !/quotes/
 !/docs/
 quotes/data/
