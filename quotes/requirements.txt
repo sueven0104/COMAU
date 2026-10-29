@@ -1,0 +1,9 @@
+# AI 报价查询系统 - 运行依赖
+# 不锁定版本，由 pip 按目标机器的 Python 版本自动选择兼容版本。
+fastapi
+uvicorn
+python-multipart
+openai
+openpyxl
+extract-msg
+pymupdf

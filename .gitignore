@@ -5,6 +5,7 @@
 !/quotes/
 !/docs/
 quotes/data/
+quotes/wheels/
 quotes/quotes.egg-info/
 quotes/__pycache__/
 **/__pycache__/
