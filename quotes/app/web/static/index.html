@@ -145,7 +145,7 @@
   .eyebrow::before{content:'';width:16px;height:1px;background:var(--violet-2)}
 
   /* ---------------- 布局 ---------------- */
-  main{position:relative;z-index:2;max-width:1420px;margin:0 auto;padding:26px 24px 40px}
+  main{position:relative;z-index:2;max-width:1420px;margin:0 auto;padding:22px 24px 22px}
   .view{display:none}
   .view.active{display:block;animation:rise .42s cubic-bezier(.2,.7,.3,1)}
   .panel{
@@ -153,55 +153,62 @@
     background:linear-gradient(180deg,rgba(29,25,39,.86),rgba(20,17,28,.72));
     box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
   }
-  .label{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
-  .label b{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);font-weight:500}
-  .label span{font-size:11px;color:var(--mute)}
-  .label.mt{margin-top:22px}
+  .label{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .label b{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  .label span{font-size:11.5px;color:var(--mute)}
+  .label.mt{margin-top:12px}
 
   /* ---------------- 对话：左栏 + 控制台 ---------------- */
+  /* 首屏按可视高度铺满：左栏与控制台同高，避免整页滚动 */
   .chat-layout{
     display:grid;grid-template-columns:minmax(330px,.78fr) minmax(0,1.3fr);
-    gap:26px;align-items:start;
+    gap:24px;align-items:stretch;
+    height:calc(100vh - 158px);min-height:540px;max-height:900px;
   }
-  .intro{display:flex;flex-direction:column;padding:6px 0 0;min-height:0}
-  .intro h1{font-size:clamp(34px,4vw,64px);letter-spacing:-.045em;margin:14px 0 0;color:#f4f0fd}
+  .intro{
+    display:flex;flex-direction:column;padding:2px 6px 0 0;min-height:0;
+    overflow-y:auto;scrollbar-width:thin;
+  }
+  .intro h1{font-size:clamp(32px,3vw,48px);letter-spacing:-.045em;margin:8px 0 0;color:#f4f0fd}
   .intro h1 em{font-style:normal;color:var(--violet-2)}
   .intro h1 .stop{color:var(--violet)}
-  .intro .lede{margin-top:16px;font-size:13.5px;line-height:1.75;color:var(--dim);max-width:390px}
-  .intro .lede b{color:#e7def8;font-family:var(--mono);font-size:13px}
-  .intro-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+  .intro .lede{margin-top:10px;font-size:12.5px;line-height:1.65;color:var(--dim);max-width:400px}
+  .intro .lede b{color:#e7def8;font-family:var(--mono);font-size:12.5px}
+  .intro .lede .scope{margin:0 .22em;color:#e7def8}
+  .intro-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .intro-actions .btn{padding:9px 18px;font-size:13px}
 
-  .stat-row{display:flex;gap:0;margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+  .stat-row{display:flex;gap:0;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
   .stat{flex:1;padding:0 14px;border-left:1px solid var(--line)}
   .stat:first-child{border-left:0;padding-left:0}
-  .stat b{display:block;font-family:var(--mono);font-size:24px;font-weight:500;letter-spacing:-.03em;color:#f2ecfd;line-height:1.1}
-  .stat span{display:block;margin-top:3px;font-size:10px;letter-spacing:.08em;color:var(--mute)}
+  .stat b{display:block;font-family:var(--mono);font-size:21px;font-weight:500;letter-spacing:-.03em;color:#f2ecfd;line-height:1.1}
+  .stat span{display:block;margin-top:2px;font-size:10px;letter-spacing:.08em;color:var(--mute)}
   .stat.hot b{color:var(--violet-2)}
 
-  .signal{margin-top:20px}
-  .signal-head{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
-  .signal-list{display:flex;flex-direction:column;gap:8px}
-  .signal-item{display:grid;grid-template-columns:1fr 112px 34px;align-items:center;gap:10px;font-size:11px;color:var(--dim)}
+  .signal{margin-top:12px}
+  .signal-head{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);margin-bottom:7px}
+  .signal-list{display:flex;flex-direction:column;gap:4px}
+  .signal-item{display:grid;grid-template-columns:1fr 104px 32px;align-items:center;gap:10px;font-size:11px;line-height:1.45;color:var(--dim)}
   .signal-item .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .signal-track{display:block;height:4px;border-radius:2px;background:rgba(226,219,246,.07);overflow:hidden}
   .signal-fill{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#9d6bff,#e3d6ff);box-shadow:0 0 12px rgba(160,113,255,.55);transition:width .7s cubic-bezier(.2,.7,.3,1)}
   .signal-item .c{font-family:var(--mono);font-size:10px;color:var(--mute);text-align:right}
 
-  .intro-divider{height:1px;background:var(--line);margin:20px 0 16px}
-  .tip-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
-  .tip-row:last-child{border-bottom:0}
-  .tip-row i{font-family:var(--mono);font-size:9.5px;color:var(--violet-2);padding-top:2px;letter-spacing:.06em;font-style:normal}
-  .tip-row b{display:block;font-size:12.5px;font-weight:500;color:#e6dff5}
-  .tip-row p{font-size:11.5px;line-height:1.6;color:var(--mute);margin-top:2px}
-  .terms{display:flex;flex-wrap:wrap;gap:6px}
+  .intro-divider{height:1px;background:var(--line);margin:12px 0 10px}
+  .tips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .tip-row{display:flex;gap:7px;padding:7px 9px;border:1px solid var(--line);border-radius:12px;background:rgba(226,219,246,.02)}
+  .tip-row i{font-family:var(--mono);font-size:9px;line-height:1.4;color:var(--violet-2);letter-spacing:.06em;font-style:normal;margin-top:1px;flex:none}
+  .tip-row b{display:block;font-size:11.5px;font-weight:500;line-height:1.35;color:#e6dff5}
+  .tip-row p{font-size:10.5px;line-height:1.5;color:var(--mute);margin-top:2px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .terms{display:flex;flex-wrap:wrap;gap:5px}
   .terms span{
-    font-size:11px;padding:4px 9px;border-radius:var(--pill);border:1px solid var(--line);
+    font-size:10.5px;padding:2px 8px;border-radius:var(--pill);border:1px solid var(--line);
     color:var(--dim);background:rgba(226,219,246,.03);white-space:nowrap;
   }
-  .terms span i{font-style:normal;color:var(--violet-2);margin:0 4px}
+  .terms span i{font-style:normal;color:var(--violet-2);margin:0 3px}
 
   .console{
-    display:flex;flex-direction:column;min-height:540px;height:calc(100vh - 150px);max-height:880px;
+    display:flex;flex-direction:column;min-height:0;height:100%;
     overflow:hidden;border-radius:22px;
     border:1px solid var(--line-2);background:linear-gradient(180deg,rgba(26,22,36,.92),rgba(17,14,24,.88));
     box-shadow:0 30px 70px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
@@ -209,8 +216,8 @@
   .console-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
   .console-title{display:flex;align-items:center;gap:11px;min-width:0}
   .console-title .pip{width:7px;height:7px;border-radius:50%;background:var(--violet-2);box-shadow:0 0 12px var(--violet-2);animation:blink 2.6s infinite;flex:none}
-  .console-title b{font-size:13px;font-weight:500;letter-spacing:.01em;display:block;line-height:1.2}
-  .console-title small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--mute);text-transform:uppercase;margin-top:2px}
+  .console-title b{font-size:14px;font-weight:500;letter-spacing:.01em;display:block;line-height:1.2}
+  .console-title small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--mute);text-transform:uppercase;margin-top:2px}
   .console-tools{display:flex;align-items:center;gap:8px}
   .chip-static{
     font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet-3);
@@ -222,8 +229,8 @@
   .empty-mark{width:54px;height:54px;margin:0 auto 12px;position:relative;display:grid;place-items:center}
   .empty-mark::before{content:'';position:absolute;inset:-12px;border-radius:50%;background:radial-gradient(circle,rgba(160,113,255,.24),transparent 68%);filter:blur(8px)}
   .empty-mark .mark{width:52px;height:52px;position:relative;z-index:1}
-  .empty h3{font-size:23px;letter-spacing:-.03em;color:#f4f0fd}
-  .empty > p{margin-top:7px;font-size:12px;line-height:1.65;color:var(--mute)}
+  .empty h3{font-size:25px;letter-spacing:-.03em;color:#f4f0fd}
+  .empty > p{margin-top:7px;font-size:12.5px;line-height:1.65;color:var(--mute)}
   .empty > p b{color:var(--violet-3);font-family:var(--mono);font-size:12px}
   .empty-list{margin-top:16px;border-top:1px solid var(--line);text-align:left}
   .empty-list button{
@@ -233,8 +240,8 @@
   .empty-list button:hover{padding-left:10px;background:linear-gradient(90deg,rgba(160,113,255,.07),transparent)}
   .empty-list i{font-family:var(--mono);font-size:9.5px;font-style:normal;color:var(--mute);letter-spacing:.06em;flex:none;width:18px}
   .empty-list span{flex:1;min-width:0}
-  .empty-list b{display:block;font-size:12.5px;font-weight:500;color:#e9e2f7;transition:.2s}
-  .empty-list small{display:block;font-size:10.5px;color:var(--mute);margin-top:1px}
+  .empty-list b{display:block;font-size:13.5px;font-weight:500;color:#e9e2f7;transition:.2s}
+  .empty-list small{display:block;font-size:11px;color:var(--mute);margin-top:1px}
   .empty-list em{font-style:normal;color:var(--mute);transition:.2s;font-size:14px}
   .empty-list button:hover b{color:#fff}
   .empty-list button:hover em{color:var(--violet-2);transform:translateX(3px)}
@@ -579,7 +586,7 @@
   .toast.error::before{background:var(--rose);box-shadow:0 0 8px var(--rose)}
 
   .foot{
-    position:relative;z-index:2;max-width:1420px;margin:0 auto;padding:20px 24px 30px;
+    position:relative;z-index:2;max-width:1420px;margin:0 auto;padding:12px 24px 16px;
     display:flex;align-items:center;gap:11px;border-top:1px solid var(--line);
     font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#5c5470;
   }
@@ -603,7 +610,7 @@
 
   /* ---------------- 响应式 ---------------- */
   @media (max-width:1280px){
-    .chat-layout{grid-template-columns:minmax(300px,.72fr) minmax(0,1.3fr);gap:20px}
+    .chat-layout{grid-template-columns:minmax(320px,.88fr) minmax(0,1.3fr);gap:20px}
     .inquiry-grid{grid-template-columns:1fr}
   }
   @media (max-width:1020px){
@@ -614,31 +621,40 @@
     .top-actions{margin-left:auto}
     .brand-text small{display:none}
     main{padding:18px 14px 30px}
-    .chat-layout{grid-template-columns:1fr;gap:18px}
-    .intro{order:2;padding-top:4px}
+    .chat-layout{grid-template-columns:1fr;gap:18px;height:auto;min-height:0;max-height:none}
+    .intro{order:2;padding-top:4px;overflow:visible}
     .console{order:1;position:static;height:min(74vh,700px);max-height:none;min-height:480px}
     .intro h1{font-size:clamp(30px,7vw,40px)}
-    .intro .lede{max-width:none}
+    .intro .lede{max-width:none;font-size:13px;line-height:1.7}
     .stat-strip{margin-bottom:18px}
     .steps{overflow-x:auto;border-bottom:0}
     .step{min-width:190px}
-    .foot{padding:16px 14px 26px}
+    .foot{padding:12px 14px 22px}
     .foot .hide-sm{display:none}
   }
-  @media (min-width:1021px) and (max-height:840px){
-    main{padding-top:18px}
-    .intro h1{font-size:clamp(30px,3.4vw,48px)}
-    .intro .lede{margin-top:12px;font-size:13px}
-    .intro-actions{margin-top:16px}
-    .stat-row{margin-top:16px;padding-top:12px}
-    .stat b{font-size:21px}
-    .signal{margin-top:14px}
-    .signal-list{gap:6px}
-    .intro-divider{margin:14px 0 12px}
-    .tip-row{padding:7px 0}
-    .tip-row p{font-size:11px}
-    .label.mt{margin-top:14px}
-    .terms span{padding:3px 8px;font-size:10.5px}
+  /* 矮屏（笔记本常见 768~860 高）进一步收紧，保证首屏完整 */
+  @media (min-width:1021px) and (max-height:860px){
+    main{padding-top:16px;padding-bottom:16px}
+    .chat-layout{height:calc(100vh - 146px);min-height:470px}
+    .intro h1{font-size:clamp(28px,2.8vw,42px)}
+    .intro .lede{margin-top:8px}
+    .intro-actions{margin-top:12px}
+    .stat-row{margin-top:12px;padding-top:8px}
+    .signal{margin-top:10px}
+    .intro-divider{margin:6px 0 4px}
+    .label.mt{margin-top:10px}
+    .tips{gap:6px}
+    .tip-row{padding:6px 8px}
+    .console-head{padding:12px 18px}
+    .chat-log{padding:18px}
+  }
+  /* 极矮屏：让出页脚空间，优先保证首屏内容 */
+  @media (min-width:1021px) and (max-height:760px){
+    .foot{display:none}
+    .chat-layout{height:calc(100vh - 100px)}
+    .intro h1{font-size:clamp(26px,2.6vw,36px)}
+    .signal-list{gap:3px}
+    .signal{margin-top:8px}
   }
   @media (max-width:720px){
     .stat-cell{min-width:50%;padding:13px 12px}
@@ -688,7 +704,7 @@
       <aside class="intro">
         <span class="eyebrow">quote intelligence · local knowledge base</span>
         <h1>把历史报价<br>问成<em>一句话</em><span class="stop">.</span></h1>
-        <p class="lede">覆盖 BAIC BE13 / BE22 与 Tesla R05 的 <b id="heroItems">—</b> 条历史报价。用自然语言提问，答案带来源文件与位置。</p>
+        <p class="lede" id="heroLede">覆盖本地知识库的历史报价。用自然语言提问，答案带来源文件与位置。</p>
 
         <div class="intro-actions">
           <button type="button" class="btn btn-primary" id="heroAsk">
@@ -713,9 +729,11 @@
 
         <div class="intro-divider"></div>
         <div class="label"><b>提问技巧</b><span>三步问清楚</span></div>
-        <div class="tip-row"><i>01</i><div><b>带上项目与品类</b><p>如「BE22 七轴」「Tesla 吊具」，检索范围更聚焦。</p></div></div>
-        <div class="tip-row"><i>02</i><div><b>明确想要的结果</b><p>对比 / 最低价 / 报价次数 / 价格区间，一句话说清。</p></div></div>
-        <div class="tip-row"><i>03</i><div><b>关注溯源标签</b><p>每个价格都标注来源文件，点击可查看原始位置。</p></div></div>
+        <div class="tips">
+          <div class="tip-row"><i>01</i><div><b>带上项目与品类</b><p>如「BE22 七轴」「Tesla 吊具」，检索范围更聚焦。</p></div></div>
+          <div class="tip-row"><i>02</i><div><b>明确想要的结果</b><p>对比 / 最低价 / 报价次数 / 价格区间，一句话说清。</p></div></div>
+          <div class="tip-row"><i>03</i><div><b>关注溯源标签</b><p>每个价格都标注来源文件，点击可查看原始位置。</p></div></div>
+        </div>
 
         <div class="label mt"><b>术语映射</b><span>自动归一</span></div>
         <div class="terms">
@@ -1625,6 +1643,18 @@
     ).join('');
   }
 
+  function renderHeroLede(projects, total) {
+    const el = $('#heroLede');
+    if (!el) return;
+    const names = projects.slice(0, 3).map(esc);
+    const listed = names.join('、');
+    const scope = projects.length > 3
+      ? listed + ' 等 ' + projects.length + ' 个项目'
+      : (listed || '本地知识库');
+    const count = total ? ' <b>' + fmtInt.format(total) + '</b> 条' : '';
+    el.innerHTML = '覆盖<span class="scope">' + scope + '</span>的' + count + '历史报价。用自然语言提问，答案带来源文件与位置。';
+  }
+
   async function loadOverview() {
     const results = await Promise.allSettled([
       api('/api/files'), api('/api/review'), api('/api/meta')
@@ -1635,9 +1665,11 @@
     if (results[2].status === 'fulfilled') state.meta = results[2].value;
 
     state.itemTotal = state.files.reduce((sum, f) => sum + (Number(f.item_count) || 0), 0);
-    const projects = new Set(state.files.map((f) => f.project_code).filter((p) => p && p !== '_root'));
-    const projectCount = projects.size || ((state.meta && state.meta.projects)
-      ? state.meta.projects.filter((p) => p && p !== '_root').length : 0);
+    const projectNames = Array.from(new Set(
+      ((state.meta && state.meta.projects) || state.files.map((f) => f.project_code))
+        .filter((p) => p && p !== '_root')
+    )).sort();
+    const projectCount = projectNames.length;
     const supplierCount = (state.meta && state.meta.suppliers) ? state.meta.suppliers.length : 0;
 
     countUp('heroProjects', projectCount);
@@ -1647,7 +1679,7 @@
     countUp('dFiles', state.files.length);
     countUp('dItems', state.itemTotal);
     countUp('dReview', state.review.length);
-    setText('heroItems', state.itemTotal ? fmtInt.format(state.itemTotal) : '1,000+');
+    renderHeroLede(projectNames, state.itemTotal);
     setText('filesCount', fmtInt.format(state.files.length));
     setText('reviewCount', fmtInt.format(state.review.length));
     renderHeroCats(state.meta && state.meta.category_stats);
