@@ -524,6 +524,8 @@
   .type{font-family:var(--mono);font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:var(--pill);padding:2px 8px;white-space:nowrap}
   .file-name{font-size:11.5px;color:#e2d9f3;word-break:break-all}
   .file-path{max-width:430px;margin-top:3px;font-family:var(--mono);font-size:9.5px;line-height:1.5;color:#645c78;word-break:break-all}
+  .file-path a{color:inherit;text-decoration:none;border-bottom:1px dashed rgba(120,110,150,.45);cursor:pointer}
+  .file-path a:hover{color:#7c5cff;border-bottom-color:#7c5cff}
   .muted-cell{max-width:300px;color:var(--dim);font-size:11px;line-height:1.5}
 
   .seg{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:var(--pill);background:rgba(11,9,16,.5)}
@@ -567,21 +569,6 @@
   .shortcut{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
   .shortcut:last-child{border-bottom:0}
   kbd{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:5px;border:1px solid var(--line-2);background:rgba(226,219,246,.05);color:var(--text)}
-
-  /* ---------------- 弹窗 ---------------- */
-  .modal{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;background:rgba(8,6,12,.76);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:.24s}
-  .modal.open{opacity:1;pointer-events:auto}
-  .modal-card{width:min(540px,100%);padding:24px;border-radius:20px;border:1px solid var(--line-2);background:linear-gradient(180deg,#1a1624,#120f1a);box-shadow:0 30px 90px rgba(0,0,0,.6);transform:translateY(10px);transition:.24s}
-  .modal.open .modal-card{transform:none}
-  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  .modal-head h3{font-size:19px;letter-spacing:-.02em;margin-top:8px;color:#f4effd}
-  .modal-sub{margin:8px 0 16px;font-family:var(--mono);font-size:10.5px;color:var(--mute);word-break:break-all}
-  .cite-detail{display:flex;flex-direction:column;gap:13px}
-  .cite-detail > div{display:flex;flex-direction:column;gap:3px}
-  .cite-detail span{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
-  .cite-detail b{font-size:12px;font-weight:400;line-height:1.7;color:#ded5f0;word-break:break-all}
-  .cite-detail .path{font-family:var(--mono);font-size:10.5px;color:var(--violet-3)}
-  .modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
 
   .toasts{position:fixed;right:22px;bottom:22px;z-index:100;display:flex;flex-direction:column;gap:8px;max-width:350px}
   .toast{
@@ -740,7 +727,7 @@
         <div class="tips">
           <div class="tip-row"><i>01</i><div><b>带上项目与品类</b><p>如「BE22 七轴」「Tesla 吊具」，检索范围更聚焦。</p></div></div>
           <div class="tip-row"><i>02</i><div><b>明确想要的结果</b><p>对比 / 最低价 / 报价次数 / 价格区间，一句话说清。</p></div></div>
-          <div class="tip-row"><i>03</i><div><b>关注溯源标签</b><p>每个价格都标注来源文件，点击可查看原始位置。</p></div></div>
+          <div class="tip-row"><i>03</i><div><b>关注溯源标签</b><p>每个价格都标注来源文件，点击可直接打开源文件。</p></div></div>
         </div>
 
         <div class="label mt"><b>术语映射</b><span>自动归一</span></div>
@@ -1038,21 +1025,7 @@
   </div>
 </aside>
 
-<!-- 溯源弹窗 -->
-<div class="modal" id="citeModal" role="dialog" aria-modal="true" aria-labelledby="citeTitle">
-  <div class="modal-card">
-    <div class="modal-head">
-      <div><span class="eyebrow">source trace</span><h3 id="citeTitle">来源详情</h3></div>
-      <button type="button" class="icon-btn" id="citeClose" aria-label="关闭">×</button>
-    </div>
-    <div class="modal-sub" id="citeName">—</div>
-    <div id="citeBody"></div>
-    <div class="modal-actions">
-      <button type="button" class="btn btn-ghost sm" id="citeCopy">复制文件路径</button>
-      <button type="button" class="btn btn-primary" id="citeOk">知道了</button>
-    </div>
-  </div>
-</div>
+<!-- 溯源：点击来源标签经 /api/source 直接打开源文件（浏览器内联预览 PDF/图片，其余下载） -->
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
@@ -1216,9 +1189,11 @@
             const idx = citeIndexOf(v, cites);
             if (idx >= 0) {
               const cite = cites[idx];
-              const tip = basename(cite.source_path) + (cite.source_location ? ' · ' + cite.source_location : '');
+              const tip = (cite.source_path || '') +
+                (cite.source_location ? ' · ' + cite.source_location : '');
               return '<td class="col-src"><button type="button" class="cite-ref" data-cite="' +
-                encodeURIComponent(JSON.stringify(cite)) + '" title="' + esc(tip) + '">' + (idx + 1) + '</button></td>';
+                encodeURIComponent(JSON.stringify(cite)) + '" title="' + esc(tip) +
+                '（点击打开源文件）">' + (idx + 1) + '</button></td>';
             }
           }
           return '<td' + (cls[n] ? ' class="' + cls[n] + '"' : '') + '>' + inlineFmt(v) + '</td>';
@@ -1271,7 +1246,9 @@
   function citesHTML(cites) {
     if (!cites || !cites.length) return '';
     const chips = cites.slice(0, 8).map((c, n) =>
-      '<button type="button" class="cite-chip" data-cite="' + encodeURIComponent(JSON.stringify(c)) + '" title="查看来源详情">' +
+      '<button type="button" class="cite-chip" data-cite="' + encodeURIComponent(JSON.stringify(c)) +
+        '" title="' + esc((c.source_path || '') + (c.source_location ? ' · ' + c.source_location : '') +
+        '（点击打开源文件）') + '">' +
         '<span class="hash">' + (n + 1) + '</span>' +
         '<span class="cite-file">' + esc(basename(c.source_path)) + '</span>' +
         '<span class="cite-loc">' + esc(c.source_location || '') + '</span>' +
@@ -1646,7 +1623,8 @@
         '</tr></thead><tbody>' + rows.map((f) =>
           '<tr>' +
             '<td><span class="proj">' + esc(f.project_code || '—') + '</span></td>' +
-            '<td><div class="file-name">' + esc(basename(f.path)) + '</div><div class="file-path">' + esc(f.path) + '</div></td>' +
+            '<td><div class="file-name">' + esc(basename(f.path)) + '</div><div class="file-path"><a href="/api/source?path=' +
+              encodeURIComponent(f.path) + '" target="_blank" rel="noopener" title="点击打开源文件">' + esc(f.path) + '</a></div></td>' +
             '<td><span class="type">' + esc(String(f.file_type || '').replace('.', '').toUpperCase() || '—') + '</span></td>' +
             '<td class="mono">' + num(f.item_count) + '</td>' +
             '<td class="muted-cell">' + esc(f.email_subject || '—') + '</td>' +
@@ -1671,7 +1649,8 @@
             '<td class="mono price">' + num(r.unit_price) + '</td>' +
             '<td class="muted-cell">' + esc(r.supplier || '—') + '</td>' +
             '<td class="mono dim">' + esc(r.source_location || '—') + '</td>' +
-            '<td><div class="file-name">' + esc(basename(r.path)) + '</div><div class="file-path">' + esc(r.path) + '</div></td>' +
+            '<td><div class="file-name">' + esc(basename(r.path)) + '</div><div class="file-path"><a href="/api/source?path=' +
+              encodeURIComponent(r.path) + '" target="_blank" rel="noopener" title="点击打开源文件">' + esc(r.path) + '</a></div></td>' +
           '</tr>'
         ).join('') + '</tbody></table></div>';
     }
@@ -1729,31 +1708,11 @@
     renderData();
   }
 
-  /* ---------- 溯源 / 抽屉 ---------- */
-  function openCite(encoded) {
-    let c = {};
-    try { c = JSON.parse(decodeURIComponent(encoded || '')); } catch (e) { c = {}; }
-    setText('citeName', basename(c.source_path));
-    $('#citeBody').innerHTML = '<div class="cite-detail">' +
-      '<div><span>条目 ID</span><b>#' + esc(c.item_id) + '</b></div>' +
-      '<div><span>源文件</span><b class="path">' + esc(c.source_path || '—') + '</b></div>' +
-      '<div><span>位置</span><b>' + esc(c.source_location || '—') + '</b></div>' +
-      '<div><span>说明</span><b>该来源为本次检索命中的历史报价记录，使用前建议核对原文件中的商务条款与税率。</b></div>' +
-    '</div>';
-    $('#citeCopy').onclick = () => {
-      const path = c.source_path || '';
-      if (!path) { toast('没有可复制的路径', 'error'); return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(path).then(() => toast('文件路径已复制')).catch(() => toast('复制失败', 'error'));
-      } else {
-        toast('当前浏览器不支持自动复制', 'error');
-      }
-    };
-    $('#citeModal').classList.add('open');
-    syncLock();
+  /* ---------- 溯源 ---------- */
+  function openSource(path) {
+    if (!path) { toast('该来源没有可打开的文件', 'error'); return; }
+    window.open('/api/source?path=' + encodeURIComponent(path), '_blank', 'noopener');
   }
-
-  function closeCite() { $('#citeModal').classList.remove('open'); syncLock(); }
 
   function openHelp() {
     $('#helpDrawer').classList.add('open');
@@ -1770,7 +1729,7 @@
   }
 
   function syncLock() {
-    const locked = $('#helpDrawer').classList.contains('open') || $('#citeModal').classList.contains('open');
+    const locked = $('#helpDrawer').classList.contains('open');
     document.body.classList.toggle('lock', locked);
   }
 
@@ -1831,7 +1790,10 @@
     });
     $('#chatLog').addEventListener('click', (e) => {
       const chip = e.target.closest('.cite-chip, .cite-ref');
-      if (chip) openCite(chip.getAttribute('data-cite'));
+      if (!chip) return;
+      let c = {};
+      try { c = JSON.parse(decodeURIComponent(chip.getAttribute('data-cite') || '')); } catch (err) { c = {}; }
+      openSource(c.source_path);
     });
 
     // 清单匹配
@@ -1908,17 +1870,14 @@
       loadOverview().then(() => toast('数据已刷新'));
     });
 
-    // 帮助 / 弹窗
+    // 帮助抽屉
     $('#helpBtn').addEventListener('click', openHelp);
     $('#helpClose').addEventListener('click', closeHelp);
     $('#helpOverlay').addEventListener('click', closeHelp);
-    $('#citeClose').addEventListener('click', closeCite);
-    $('#citeOk').addEventListener('click', closeCite);
-    $('#citeModal').addEventListener('click', (e) => { if (e.target.id === 'citeModal') closeCite(); });
 
     // 快捷键
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { closeHelp(); closeCite(); return; }
+      if (e.key === 'Escape') { closeHelp(); return; }
       const tag = (e.target.tagName || '').toLowerCase();
       if (['input','textarea','select'].includes(tag) || e.target.isContentEditable) return;
       if (e.key === '1') switchView('chat');

@@ -62,6 +62,27 @@ def test_files_and_review_endpoints(monkeypatch, tmp_path):
     assert "7-Axis" in meta["categories"] and "盛允" in meta["suppliers"]
     assert meta["category_stats"][0]["count"] >= 1
 
+def test_paths_returned_relative(monkeypatch, tmp_path):
+    tc, conn = _client(monkeypatch, tmp_path)
+    fid = conn.execute("""INSERT INTO source_files(path,content_hash,file_type,
+        project_code,processed_at) VALUES('D:/Old/COMAU/raw_data/BAIC/报价.xlsx',
+        'h','.xlsx','BAIC',?) RETURNING id""", (server.db.now(),)).fetchone()[0]
+    conn.commit()
+    files = tc.get("/api/files").json()["files"]
+    assert files[0]["path"] == "raw_data/BAIC/报价.xlsx"
+
+def test_source_endpoint(monkeypatch, tmp_path):
+    tc, conn = _client(monkeypatch, tmp_path)
+    root = tmp_path / "raw_data"
+    (root / "BAIC").mkdir(parents=True)
+    (root / "BAIC" / "a.pdf").write_bytes(b"%PDF-1.4 fake")
+    monkeypatch.setattr(server, "CFG", dict(server.CFG, data_root_abs=root))
+    r = tc.get("/api/source", params={"path": "raw_data/BAIC/a.pdf"})
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    # 越出 raw_data 根 → 拒绝
+    assert tc.get("/api/source", params={"path": "quotes/app/config.py"}).status_code == 400
+    assert tc.get("/api/source", params={"path": "raw_data/BAIC/missing.pdf"}).status_code == 404
+
 
 def test_static_assets(monkeypatch, tmp_path):
     tc, _ = _client(monkeypatch, tmp_path)

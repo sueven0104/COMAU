@@ -1,4 +1,6 @@
 import openpyxl
+from urllib.parse import unquote
+
 from app import db
 from app.export.draft import export_draft
 from app.matching.inquiry import InquiryLine
@@ -29,3 +31,30 @@ def test_export_draft_columns_and_rows(tmp_path):
     row2 = [c.value for c in ws[2]]
     assert row2[0] == 2 and row2[header.index("建议价")] == 100.0
     assert "盛允.xlsx" in row2[header.index("溯源")]
+
+def test_export_draft_trace_relative_and_hyperlink(tmp_path):
+    conn = db.connect(":memory:")
+    fid = db.upsert_source_file(conn, {
+        "path": "D:/OldMachine/COMAU/raw_data/BAIC/7-axis/盛允报价.xlsx",
+        "content_hash": "h", "file_type": ".xlsx",
+        "project_code": "BAIC", "email_subject": None, "email_from": None,
+        "email_date": None, "email_body": None, "processed_at": db.now()})
+    ids = db.insert_quote_items(conn, fid, "BAIC", [
+        {"supplier": "盛允", "category": "7-Axis", "product_name": "机器人七轴",
+         "spec": "11.5m", "brand": None, "model": None, "qty": 1, "unit": "套",
+         "unit_price": 100.0, "currency": "CNY", "tax_included": True,
+         "price_status": "本次报价", "quote_date": "2026-09-01", "terms": None,
+         "source_location": "R3", "confidence": 0.9, "needs_review": 0}])
+    lines = [InquiryLine(1, "7-Axis七轴", "机器人七轴 11.5m", None, 1)]
+    matches = [MatchResult(1, "相似匹配", quote_item_ids=ids, basis="b",
+                           explanation="e")]
+    root = tmp_path / "raw_data"
+    (root / "BAIC" / "7-axis").mkdir(parents=True)
+    (root / "BAIC" / "7-axis" / "盛允报价.xlsx").write_bytes(b"x")
+    out = tmp_path / "draft.xlsx"
+    export_draft(conn, lines, matches, out, data_root=root)
+    ws = openpyxl.load_workbook(out).active
+    header = [c.value for c in ws[1]]
+    trace = ws.cell(row=2, column=header.index("溯源") + 1)
+    assert trace.value == "raw_data/BAIC/7-axis/盛允报价.xlsx R3"
+    assert unquote(trace.hyperlink.target).endswith("盛允报价.xlsx")
